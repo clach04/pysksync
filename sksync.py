@@ -85,7 +85,7 @@ class SKBufferedSocket(object):
                 raise StopIteration
 
 
-def get_file_list(path_of_files):
+def get_file_list(path_of_files, recursive=False, include_size=False):
     current_dir = os.getcwd()  # TODO non-ascii; os.getcwdu()
     # TODO include file size param
     # TODO recursive param
@@ -100,7 +100,10 @@ def get_file_list(path_of_files):
             mtime = x.st_mtime
             # TODO non-ascii path names
             mtime = int(mtime) * 1000  # TODO norm
-            file_details = (filename, mtime)
+            if include_size:
+                file_details = (filename, mtime, x.st_size)
+            else:
+                file_details = (filename, mtime)
             file_list_info.append(file_details)
     os.chdir(current_dir)
     return file_list_info
@@ -154,16 +157,12 @@ class MyTCPHandler(SocketServer.BaseRequestHandler):
         # we're done receiving data from client now
         self.request.send('\n')
         
-        test_fixtures = [
-            ('test1.txt', 1345316082.71875, '1'),
-            ('test2.txt', 1345316082.71875 - 12, '2'),
-            #('test3.txt', 1345316082.71875 - 72, '3'),
-        ]
-        for filename, mtime, data in test_fixtures:
-            print '-' * 65
-            mtime = int(mtime) * 1000  # TODO norm
-            data_len = len(data)
+        os.chdir(server_path)
+        for filename, mtime, data_len in get_file_list(server_path, include_size=True):
             file_details = '%s\n%d\n%d\n' % (filename, mtime, data_len)  # FIXME non-asci filenames
+            f = open(filename, 'rb')
+            data = f.read()
+            f.close()
             self.request.send(file_details)
             self.request.send(data)
 
