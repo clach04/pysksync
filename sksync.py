@@ -10,6 +10,8 @@ import logging
 import glob
 
 
+SKSYNC_PROTOCOL_01 = 'sksync 1\n'
+
 logging.basicConfig()
 logger = logging
 logger = logging.getLogger("sksync")
@@ -51,8 +53,9 @@ class SKBufferedSocket(object):
         data_len = len(self.data)
         while not (bytecount <= data_len):
             logger.debug("about to call server_sock.recv")
-            logger.debug("bytecount - data_len %r", (bytecount, data_len, bytecount - data_len))
-            tmp_bytes = self.server_sock.recv(bytecount - data_len)
+            read_length = bytecount - data_len
+            logger.debug("read_length %r", (bytecount, data_len, read_length))
+            tmp_bytes = self.server_sock.recv(read_length)
             self.data = self.data + tmp_bytes
             data_len = len(self.data)
         data = self.data[:bytecount]
@@ -101,7 +104,7 @@ def empty_client_paths(ip, port, server_path, client_path):
     s = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
     s.connect((ip, port))
     
-    message = 'sksync 1\n'
+    message = SKSYNC_PROTOCOL_01
     len_sent = s.send(message)
     logger.debug('sent: len %d %r' % (len_sent, message, ))
     
@@ -120,7 +123,7 @@ def empty_client_paths(ip, port, server_path, client_path):
     # example: '0\n/tmp/skmemos\n/sdcard/skmemos\n\n'
     if file_list_str:
         # FIXME this could be refactored....
-        message = '0\n' + server_path + '\n' + client_path + '\n' + file_list_str +'\n\n'
+        message = '0\n' + server_path + '\n' + client_path + '\n' + file_list_str + '\n\n'
     else:
         message = '0\n' + server_path + '\n' + client_path + '\n\n'
     len_sent = s.send(message)
@@ -173,7 +176,6 @@ def doit():
     server_path, client_path = '/tmp/skmemos', '/tmp/skmemos_client'
     print host, port, server_path, client_path
     empty_client_paths(host, port, server_path, client_path)
-
 
 
 def main(argv=None):
