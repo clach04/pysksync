@@ -16,6 +16,13 @@ SKSYNC_DEFAULT_PORT = 23456
 #SKSYNC_DEFAULT_PORT = 23456 + 3  # FIXME DEBUG not default!!
 SKSYNC_PROTOCOL_01 = 'sksync 1\n'
 SKSYNC_PROTOCOL_ESTABLISHED = 'Protocol Established\n'
+SKSYNC_PROTOCOL_TYPE_FROM_SERVER_USE_TIME = '2\n'
+SKSYNC_PROTOCOL_TYPE_FROM_SERVER_NO_TIME = '5\n'
+SKSYNC_PROTOCOL_TYPE_BIDIRECTIONAL_USE_TIME = '0\n'  # NOTE BIDIRECTIONAL needs checksum support
+SKSYNC_PROTOCOL_TYPE_BIDIRECTIONAL_NO_TIME = '3\n'
+SKSYNC_PROTOCOL_TYPE_TO_SERVER_USE_TIME = '1\n'
+SKSYNC_PROTOCOL_TYPE_TO_SERVER_NO_TIME = '4\n'
+
 
 logging.basicConfig()
 logger = logging
@@ -131,7 +138,8 @@ class MyTCPHandler(SocketServer.BaseRequestHandler):
 
         response = reader.next()
         logger.debug('Received: %r' % response)
-        assert response == '2\n'  # type of sync?
+        assert response in (SKSYNC_PROTOCOL_TYPE_FROM_SERVER_USE_TIME, SKSYNC_PROTOCOL_TYPE_FROM_SERVER_NO_TIME), repr(response)  # type of sync
+        # FROM SERVER appears to use the same protocol, the difference is in the server logic for working out which files to send to the client
 
         response = reader.next()
         logger.debug('Received: %r' % response)
@@ -226,8 +234,8 @@ def empty_client_paths(ip, port, server_path, client_path):
     logger.debug('Received: %r' % response)
     assert response == SKSYNC_PROTOCOL_ESTABLISHED
 
-    # type of sync?
-    message = '2\n'
+    # type of sync
+    message = SKSYNC_PROTOCOL_TYPE_FROM_SERVER_USE_TIME
     len_sent = s.send(message)
     logger.debug('sent: len %d %r' % (len_sent, message, ))
 
