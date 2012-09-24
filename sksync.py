@@ -7,6 +7,7 @@ import os
 import sys
 import socket
 import logging
+import glob
 
 
 logging.basicConfig()
@@ -79,6 +80,22 @@ def empty_client_paths(ip, port, server_path, client_path):
     that the server (chooses to) sends back.
     """
     real_client_path = os.path.abspath(client_path)
+    file_list_str = ''
+    
+    # Get non-recursive list of files in real_client_path
+    # FIXME TODO nasty hack using glob (i.e. not robust)
+    os.chdir(real_client_path)  # TODO non-ascii path names
+    file_list = glob.glob('*')
+    file_list_info = []
+    for filename in file_list:
+        if os.path.isfile(filename):
+            x = os.stat(filename)
+            mtime = x.st_mtime
+            # TODO non-ascii path names
+            mtime = int(mtime) * 1000
+            file_details = '%d %s' % (mtime, filename)
+            file_list_info.append(file_details)
+    file_list_str = '\n'.join(file_list_info)
     
     # Connect to the server
     s = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
@@ -86,7 +103,7 @@ def empty_client_paths(ip, port, server_path, client_path):
     
     message = 'sksync 1\n'
     len_sent = s.send(message)
-    logger.debug('sent: len %d "%r"' % (len_sent, message, ))
+    logger.debug('sent: len %d %r' % (len_sent, message, ))
     
     reader = SKBufferedSocket(s)
     # Receive a response
@@ -97,13 +114,17 @@ def empty_client_paths(ip, port, server_path, client_path):
     # type of sync?
     message = '2\n'
     len_sent = s.send(message)
-    logger.debug('sent: len %d "%r"' % (len_sent, message, ))
+    logger.debug('sent: len %d %r' % (len_sent, message, ))
 
     # type of sync? and folders to sync (server path, client path)
     # example: '0\n/tmp/skmemos\n/sdcard/skmemos\n\n'
-    message = '0\n' + server_path + '\n' + client_path + '\n\n'
+    if file_list_str:
+        # FIXME this could be refactored....
+        message = '0\n' + server_path + '\n' + client_path + '\n' + file_list_str +'\n\n'
+    else:
+        message = '0\n' + server_path + '\n' + client_path + '\n\n'
     len_sent = s.send(message)
-    logger.debug('sent: len %d "%r"' % (len_sent, message, ))
+    logger.debug('sent: len %d %r' % (len_sent, message, ))
 
     # Receive a response
     response = reader.next()
@@ -148,7 +169,7 @@ def empty_client_paths(ip, port, server_path, client_path):
 ## for server probably should be using SocketServer / SocketServer.TCPServer ....
 def doit():
     host, port = 'localhost', 23457
-    host, port = 'localhost', 23456
+    #host, port = 'localhost', 23456
     server_path, client_path = '/tmp/skmemos', '/tmp/skmemos_client'
     print host, port, server_path, client_path
     empty_client_paths(host, port, server_path, client_path)
