@@ -161,6 +161,7 @@ class MyTCPHandler(SocketServer.BaseRequestHandler):
         # TODO start counting and other stats
         # TODO output count and other stats
         file_list = get_file_list(server_path, include_size=True)
+        # FIXME TODO now work out which files in file_list need to be sent to the client (as the client is missing them)
         logger.info('Number of files to send: %r' % len(file_list))
         os.chdir(server_path)
         for filename, mtime, data_len in file_list:
