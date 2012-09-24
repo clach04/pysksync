@@ -128,8 +128,23 @@ class MyTCPHandler(SocketServer.BaseRequestHandler):
             logger.debug('Received: "%r"' % response)
         
         # we're done receiving data from client now
+        self.request.send('\n')
+        
+        test_fixtures = [
+            ('test1.txt', 1345316082.71875, '1'),
+            ('test2.txt', 1345316082.71875 - 12, '2'),
+            #('test3.txt', 1345316082.71875 - 72, '3'),
+        ]
+        for filename, mtime, data in test_fixtures:
+            print '-' * 65
+            mtime = int(mtime) * 1000  # TODO norm
+            data_len = len(data)
+            file_details = '%s\n%d\n%d\n' % (filename, mtime, data_len)  # FIXME non-asci filenames
+            self.request.send(file_details)
+            self.request.send(data)
+
         # Tell client there are no files to send back
-        self.request.sendall('\n\n')
+        self.request.sendall('\n')
 
 
 def run_server():
@@ -159,7 +174,7 @@ def empty_client_paths(ip, port, server_path, client_path):
             x = os.stat(filename)
             mtime = x.st_mtime
             # TODO non-ascii path names
-            mtime = int(mtime) * 1000
+            mtime = int(mtime) * 1000  # TODO norm
             file_details = '%d %s' % (mtime, filename)
             file_list_info.append(file_details)
     file_list_str = '\n'.join(file_list_info)
