@@ -6,11 +6,16 @@
 import os
 import sys
 import socket
+import SocketServer
 import logging
 import glob
 
 
+SKSYNC_DEFAULT_PORT = 23456
+#SKSYNC_DEFAULT_PORT = 23456 + 1  # FIXME DEBUG not default!!
+#SKSYNC_DEFAULT_PORT = 23456 + 3  # FIXME DEBUG not default!!
 SKSYNC_PROTOCOL_01 = 'sksync 1\n'
+SKSYNC_PROTOCOL_ESTABLISHED = 'Protocol Established\n'
 
 logging.basicConfig()
 logger = logging
@@ -64,19 +69,78 @@ class SKBufferedSocket(object):
     
     def next(self):
         while 1:
-            logger.debug("about to call server_sock.recv")
-            self.data = self.data + self.server_sock.recv(BIGBUF)
-            logger.debug("data from socket = %r", (len(self.data), self.data))
+            if not self.data or '\n' not in self.data:
+                logger.debug("about to call server_sock.recv")
+                self.data = self.data + self.server_sock.recv(BIGBUF)
+                logger.debug("data from socket = %r", (len(self.data), self.data))
             if self.data:
                 newline_pos = self.data.find('\n')
                 #if '\n' in data:
                 if newline_pos >= 0:
                     data = self.data[:newline_pos + 1]
                     self.data = self.data[newline_pos + 1:]
+                    logger.debug("remaining self.data %r", (len(self.data), self.data))
                     return data
             else:
                 raise StopIteration
 
+
+class MyTCPHandler(SocketServer.BaseRequestHandler):
+    """
+    The RequestHandler class for our server.
+
+    It is instantiated once per connection to the server, and must
+    override the handle() method to implement communication to the
+    client.
+    """
+
+    def handle(self):
+        # self.request is the TCP socket connected to the client
+        reader = SKBufferedSocket(self.request)
+        response = reader.next()
+        logger.debug('Received: "%r"' % response)
+        assert response == SKSYNC_PROTOCOL_01
+
+        message = SKSYNC_PROTOCOL_ESTABLISHED
+        len_sent = self.request.send(message)
+        logger.debug('sent: len %d %r' % (len_sent, message, ))
+
+        response = reader.next()
+        logger.debug('Received: "%r"' % response)
+        assert response == '2\n'  # type of sync?
+
+        response = reader.next()
+        logger.debug('Received: "%r"' % response)
+        assert response == '0\n'  # start of path (+file) info
+
+        server_path = reader.next()
+        logger.debug('server_path: "%r"' % server_path)
+
+        client_path = reader.next()
+        logger.debug('client_path: "%r"' % client_path)
+
+        # possible first file details
+        response = reader.next()
+        logger.debug('Received: "%r"' % response)
+        while response != '\n':
+            # TODO read and ignore all file details....
+            response = reader.next()
+            logger.debug('Received: "%r"' % response)
+        
+        # we're done receiving data from client now
+        # Tell client there are no files to send back
+        self.request.sendall('\n\n')
+
+
+def run_server():
+    HOST, PORT = 'localhost', SKSYNC_DEFAULT_PORT
+
+    # Create the server, binding to localhost on port 9999
+    server = SocketServer.TCPServer((HOST, PORT), MyTCPHandler)
+
+    # Activate the server; this will keep running until you
+    # interrupt the program with Ctrl-C
+    server.serve_forever()
 
 def empty_client_paths(ip, port, server_path, client_path):
     """client dir is assumed to be empty but handle all files
@@ -112,7 +176,7 @@ def empty_client_paths(ip, port, server_path, client_path):
     # Receive a response
     response = reader.next()
     logger.debug('Received: "%r"' % response)
-    assert response == 'Protocol Established\n'
+    assert response == SKSYNC_PROTOCOL_ESTABLISHED
 
     # type of sync?
     message = '2\n'
@@ -172,7 +236,7 @@ def empty_client_paths(ip, port, server_path, client_path):
 ## for server probably should be using SocketServer / SocketServer.TCPServer ....
 def doit():
     host, port = 'localhost', 23457
-    #host, port = 'localhost', 23456
+    host, port = 'localhost', SKSYNC_DEFAULT_PORT
     server_path, client_path = '/tmp/skmemos', '/tmp/skmemos_client'
     print host, port, server_path, client_path
     empty_client_paths(host, port, server_path, client_path)
@@ -182,7 +246,11 @@ def main(argv=None):
     if argv is None:
         argv = sys.argv
     
-    doit()
+    if 'server' in argv:
+        run_server()
+    else:
+        # run client test
+        doit()
     
     return 0
 
