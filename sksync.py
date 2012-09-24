@@ -150,6 +150,7 @@ class MyTCPHandler(SocketServer.BaseRequestHandler):
         response = reader.next()
         logger.debug('Received: %r' % response)
         while response != '\n':
+            # TODO start counting and other stats
             # TODO read and ignore all file details....
             response = reader.next()
             logger.debug('Received: %r' % response)
@@ -157,8 +158,12 @@ class MyTCPHandler(SocketServer.BaseRequestHandler):
         # we're done receiving data from client now
         self.request.send('\n')
         
+        # TODO start counting and other stats
+        # TODO output count and other stats
+        file_list = get_file_list(server_path, include_size=True)
+        logger.info('Number of files to send: %r' % len(file_list))
         os.chdir(server_path)
-        for filename, mtime, data_len in get_file_list(server_path, include_size=True):
+        for filename, mtime, data_len in file_list:
             file_details = '%s\n%d\n%d\n' % (filename, mtime, data_len)  # FIXME non-asci filenames
             f = open(filename, 'rb')
             data = f.read()
