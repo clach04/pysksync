@@ -85,6 +85,27 @@ class SKBufferedSocket(object):
                 raise StopIteration
 
 
+def get_file_list(path_of_files):
+    current_dir = os.getcwd()  # TODO non-ascii; os.getcwdu()
+    # TODO include file size param
+    # TODO recursive param
+    # Get non-recursive list of files in real_client_path
+    # FIXME TODO nasty hack using glob (i.e. not robust)
+    os.chdir(path_of_files)  # TODO non-ascii path names
+    file_list = glob.glob('*')
+    file_list_info = []
+    for filename in file_list:
+        if os.path.isfile(filename):
+            x = os.stat(filename)
+            mtime = x.st_mtime
+            # TODO non-ascii path names
+            mtime = int(mtime) * 1000  # TODO norm
+            file_details = (filename, mtime)
+            file_list_info.append(file_details)
+    os.chdir(current_dir)
+    return file_list_info
+
+
 class MyTCPHandler(SocketServer.BaseRequestHandler):
     """
     The RequestHandler class for our server.
@@ -162,6 +183,7 @@ def run_server():
     # interrupt the program with Ctrl-C
     server.serve_forever()
 
+
 def empty_client_paths(ip, port, server_path, client_path):
     """client dir is assumed to be empty but handle all files
     that the server (chooses to) sends back.
@@ -169,19 +191,12 @@ def empty_client_paths(ip, port, server_path, client_path):
     real_client_path = os.path.abspath(client_path)
     file_list_str = ''
     
-    # Get non-recursive list of files in real_client_path
-    # FIXME TODO nasty hack using glob (i.e. not robust)
-    os.chdir(real_client_path)  # TODO non-ascii path names
-    file_list = glob.glob('*')
+    # TODO recursion
+    file_list = get_file_list(real_client_path)
     file_list_info = []
-    for filename in file_list:
-        if os.path.isfile(filename):
-            x = os.stat(filename)
-            mtime = x.st_mtime
-            # TODO non-ascii path names
-            mtime = int(mtime) * 1000  # TODO norm
-            file_details = '%d %s' % (mtime, filename)
-            file_list_info.append(file_details)
+    for filename, mtime in file_list:
+        file_details = '%d %s' % (mtime, filename)
+        file_list_info.append(file_details)
     file_list_str = '\n'.join(file_list_info)
     
     # Connect to the server
