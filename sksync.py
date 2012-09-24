@@ -148,8 +148,10 @@ class MyTCPHandler(SocketServer.BaseRequestHandler):
 
 
 def run_server():
-    HOST, PORT = 'localhost', SKSYNC_DEFAULT_PORT
-
+    HOST, PORT = '0.0.0.0', SKSYNC_DEFAULT_PORT
+    
+    print HOST, PORT
+    
     # Create the server, binding to localhost on port 9999
     server = SocketServer.TCPServer((HOST, PORT), MyTCPHandler)
 
