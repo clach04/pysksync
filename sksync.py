@@ -98,7 +98,7 @@ class MyTCPHandler(SocketServer.BaseRequestHandler):
         # self.request is the TCP socket connected to the client
         reader = SKBufferedSocket(self.request)
         response = reader.next()
-        logger.debug('Received: "%r"' % response)
+        logger.debug('Received: %r' % response)
         assert response == SKSYNC_PROTOCOL_01
 
         message = SKSYNC_PROTOCOL_ESTABLISHED
@@ -106,26 +106,29 @@ class MyTCPHandler(SocketServer.BaseRequestHandler):
         logger.debug('sent: len %d %r' % (len_sent, message, ))
 
         response = reader.next()
-        logger.debug('Received: "%r"' % response)
+        logger.debug('Received: %r' % response)
         assert response == '2\n'  # type of sync?
 
         response = reader.next()
-        logger.debug('Received: "%r"' % response)
+        logger.debug('Received: %r' % response)
         assert response == '0\n'  # start of path (+file) info
 
         server_path = reader.next()
-        logger.debug('server_path: "%r"' % server_path)
+        logger.debug('server_path: %r' % server_path)
+        server_path = server_path[:-1]  # loose trailing \n
+        server_path = os.path.abspath(server_path)
+        logger.debug('server_path abs: %r' % server_path)
 
         client_path = reader.next()
-        logger.debug('client_path: "%r"' % client_path)
+        logger.debug('client_path: %r' % client_path)
 
         # possible first file details
         response = reader.next()
-        logger.debug('Received: "%r"' % response)
+        logger.debug('Received: %r' % response)
         while response != '\n':
             # TODO read and ignore all file details....
             response = reader.next()
-            logger.debug('Received: "%r"' % response)
+            logger.debug('Received: %r' % response)
         
         # we're done receiving data from client now
         self.request.send('\n')
@@ -192,7 +195,7 @@ def empty_client_paths(ip, port, server_path, client_path):
     reader = SKBufferedSocket(s)
     # Receive a response
     response = reader.next()
-    logger.debug('Received: "%r"' % response)
+    logger.debug('Received: %r' % response)
     assert response == SKSYNC_PROTOCOL_ESTABLISHED
 
     # type of sync?
@@ -212,29 +215,29 @@ def empty_client_paths(ip, port, server_path, client_path):
 
     # Receive a response
     response = reader.next()
-    logger.debug('Received: "%r"' % response)
+    logger.debug('Received: %r' % response)
     assert response == '\n'
 
     # if get CR end of session, otherwise get files
     response = reader.next()
-    logger.debug('Received: "%r"' % response)
+    logger.debug('Received: %r' % response)
     while response != '\n':
         filename = response[:-1]  # loose trailing \n
-        logger.debug('filename: "%r"' % filename)
+        logger.debug('filename: %r' % filename)
         mtime = reader.next()
-        logger.debug('mtime: "%r"' % mtime)
+        logger.debug('mtime: %r' % mtime)
         mtime = norm_mtime(mtime)
         mtime = unnorm_mtime(mtime)
-        logger.debug('mtime: "%r"' % mtime)
+        logger.debug('mtime: %r' % mtime)
         filesize = reader.next()
-        logger.debug('filesize: "%r"' % filesize)
+        logger.debug('filesize: %r' % filesize)
         filesize = int(filesize)
-        logger.debug('filesize: "%r"' % filesize)
-        logger.info('processing "%r"' % ((filename, filesize, mtime),))
+        logger.debug('filesize: %r' % filesize)
+        logger.info('processing %r' % ((filename, filesize, mtime),))
         
         # now read filesize bytes....
         filecontents = reader.recv(filesize)
-        logger.debug('filecontents: "%r"' % filecontents)
+        logger.debug('filecontents: %r' % filecontents)
         
         full_filename = os.path.join(real_client_path, filename)
         f = open(full_filename, 'wb')
@@ -244,7 +247,7 @@ def empty_client_paths(ip, port, server_path, client_path):
         
         # any more files?
         response = reader.next()
-        logger.debug('Received: "%r"' % response)
+        logger.debug('Received: %r' % response)
 
     # Clean up
     s.close()
