@@ -176,6 +176,13 @@ class MyTCPHandler(SocketServer.BaseRequestHandler):
 
 
 def run_server():
+    """Implements SK Server, currently only supports:
+       * non-recursive ONLY
+       * direction =  "from server (use time)" ONLY
+       * TODO add option for server to filter/restrict server path
+         (this is not a normal SK Sync option)
+    """
+
     HOST, PORT = '0.0.0.0', SKSYNC_DEFAULT_PORT
     
     print HOST, PORT
@@ -189,8 +196,9 @@ def run_server():
 
 
 def empty_client_paths(ip, port, server_path, client_path):
-    """client dir is assumed to be empty but handle all files
-    that the server (chooses to) sends back.
+    """Implements SK Client, currently only supports:
+       * non-recursive ONLY
+       * direction =  "from server (use time)" ONLY
     """
     real_client_path = os.path.abspath(client_path)
     file_list_str = ''
@@ -272,9 +280,7 @@ def empty_client_paths(ip, port, server_path, client_path):
     s.close()
 
 
-## for server probably should be using SocketServer / SocketServer.TCPServer ....
-def doit():
-    host, port = 'localhost', 23457
+def run_client():
     host, port = 'localhost', SKSYNC_DEFAULT_PORT
     server_path, client_path = '/tmp/skmemos', '/tmp/skmemos_client'
     print host, port, server_path, client_path
@@ -288,8 +294,7 @@ def main(argv=None):
     if 'server' in argv:
         run_server()
     else:
-        # run client test
-        doit()
+        run_client()
     
     return 0
 
