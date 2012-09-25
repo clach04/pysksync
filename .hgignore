@@ -7,3 +7,4 @@ dist
 *.pyd
 *$py.class
 *~
+tmp_testsuitedir/
