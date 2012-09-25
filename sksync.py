@@ -92,7 +92,9 @@ class SKBufferedSocket(object):
                 raise StopIteration
 
 
-def get_file_listings(path_of_files, recursive=False, include_size=False):
+def get_file_listings(path_of_files, recursive=False, include_size=False, return_list=True):
+    """return_list=True, if False returns dict
+    """
     current_dir = os.getcwd()  # TODO non-ascii; os.getcwdu()
     # TODO include file size param
     # TODO recursive param
@@ -100,7 +102,10 @@ def get_file_listings(path_of_files, recursive=False, include_size=False):
     # FIXME TODO nasty hack using glob (i.e. not robust)
     os.chdir(path_of_files)  # TODO non-ascii path names
     file_list = glob.glob('*')
-    file_list_info = []
+    if return_list:
+        listings_result = []
+    else:
+        listings_result = {}
     for filename in file_list:
         if os.path.isfile(filename):
             x = os.stat(filename)
@@ -111,9 +116,12 @@ def get_file_listings(path_of_files, recursive=False, include_size=False):
                 file_details = (filename, mtime, x.st_size)
             else:
                 file_details = (filename, mtime)
-            file_list_info.append(file_details)
+            if return_list:
+                listings_result.append(file_details)
+            else:
+                listings_result[filename] = file_details[1:]
     os.chdir(current_dir)
-    return file_list_info
+    return listings_result
 
 
 class MyTCPHandler(SocketServer.BaseRequestHandler):
@@ -168,13 +176,14 @@ class MyTCPHandler(SocketServer.BaseRequestHandler):
         
         # TODO start counting and other stats
         # TODO output count and other stats
-        file_list = get_file_listings(server_path, include_size=True)
+        file_dict = get_file_listings(server_path, include_size=True, return_list=False)
         # FIXME TODO now work out which files in file_list need to be sent to the client (as the client is missing them)
-        logger.info('Number of files to send: %r' % len(file_list))
+        logger.info('Number of files to send: %r' % len(file_dict))
         current_dir = os.getcwd()  # TODO non-ascii; os.getcwdu()
         os.chdir(server_path)
         try:
-            for filename, mtime, data_len in file_list:
+            for filename in file_dict:
+                mtime, data_len = file_dict[filename]
                 file_details = '%s\n%d\n%d\n' % (filename, mtime, data_len)  # FIXME non-asci filenames
                 f = open(filename, 'rb')
                 data = f.read()
