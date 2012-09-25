@@ -92,7 +92,7 @@ class SKBufferedSocket(object):
                 raise StopIteration
 
 
-def get_file_list(path_of_files, recursive=False, include_size=False):
+def get_file_listings(path_of_files, recursive=False, include_size=False):
     current_dir = os.getcwd()  # TODO non-ascii; os.getcwdu()
     # TODO include file size param
     # TODO recursive param
@@ -168,7 +168,7 @@ class MyTCPHandler(SocketServer.BaseRequestHandler):
         
         # TODO start counting and other stats
         # TODO output count and other stats
-        file_list = get_file_list(server_path, include_size=True)
+        file_list = get_file_listings(server_path, include_size=True)
         # FIXME TODO now work out which files in file_list need to be sent to the client (as the client is missing them)
         logger.info('Number of files to send: %r' % len(file_list))
         current_dir = os.getcwd()  # TODO non-ascii; os.getcwdu()
@@ -230,7 +230,7 @@ def empty_client_paths(ip, port, server_path, client_path):
     file_list_str = ''
     
     # TODO recursion
-    file_list = get_file_list(real_client_path)
+    file_list = get_file_listings(real_client_path)
     file_list_info = []
     for filename, mtime in file_list:
         file_details = '%d %s' % (mtime, filename)
