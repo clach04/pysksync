@@ -135,6 +135,7 @@ class TestSKSync(unittest.TestCase):
         check_file_contents_and_mtime(self.client_dir, 'test1.txt')
         check_file_contents_and_mtime(self.client_dir, 'test2.txt')
         check_file_contents_and_mtime(self.client_dir, 'test3.txt')
+        # TODO check no other files exist in self.client_dir
 
     def test_sync_from_server_with_times_to_empty_client_directory_dynamic(self):
         safe_rmtree(self.client_dir)
@@ -162,6 +163,43 @@ class TestSKSync(unittest.TestCase):
             # check file contents
             # check mtimes
             check_file_contents_and_mtime(self.client_dir, filename)
+        # TODO check no other files exist in self.client_dir
+
+
+    def test_sync_from_server_with_times_to_nonempty_client_directory_no_send(self):
+        safe_rmtree(self.client_dir)
+        safe_mkdir(self.client_dir)
+        result = os.path.isdir(self.server_dir)
+        
+        # Ensure server sends no files if the client already has files of same name that are ahead of the server files
+        test_string = 'NEVER_INCLUDE_THIS_STRING_IN_TESTS'
+        for filename in test_fixtures:
+            self.assertTrue(os.path.isfile(os.path.join(self.server_dir, filename)))
+            tmp_client_file = os.path.join(self.client_dir, filename)
+            f = open(tmp_client_file, 'wb')
+            f.write(test_string)
+            f.close()  # assume mtime is ahead of fixtures mtimes
+            self.assertTrue(os.path.isfile(tmp_client_file))
+
+            check_file_contents_and_mtime(self.server_dir, filename)
+
+        # do sync
+        perform_sync(self.server_dir, self.client_dir)
+        
+        # check files exist
+        for filename in test_fixtures:
+            self.assertTrue(os.path.isfile(os.path.join(self.client_dir, filename)))
+            # No need to check if files compare with server versions as we compared server dir with fixture contents
+        
+            # check file contents are not the server contents
+            # do not check mtimes
+            tmp_client_file = os.path.join(self.client_dir, filename)
+            f = open(tmp_client_file, 'rb')
+            data = f.read()
+            f.close()
+            assert test_string 
+            self.assertEqual(test_string, data, 'server clobbered client file %r' % filename)
+        # TODO check no other files exist in self.client_dir
 
 
 if __name__ == '__main__':
