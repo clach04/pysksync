@@ -134,5 +134,47 @@ class TestSKSync(unittest.TestCase):
         check_file_contents_and_mtime(self.client_dir, 'test3.txt')
 
 
+    def test_sync_from_server_with_times_to_empty_client_directory_dynamic(self):
+        safe_rmtree(self.client_dir)
+        safe_mkdir(self.client_dir)
+        result = os.path.isdir(self.server_dir)
+        
+        # basically a duplicate of
+        # test_sync_from_server_with_times_to_empty_client_directory()
+        # but refactored to reduce code by looping through fixtures
+        for filename in test_fixtures:
+            self.assertTrue(os.path.isfile(os.path.join(self.server_dir, filename)))
+        
+            self.assertFalse(os.path.isfile(os.path.join(self.client_dir, filename)))
+
+            check_file_contents_and_mtime(self.server_dir, filename)
+
+        # Start sync server in thread
+        
+        server = sksync.MyThreadedTCPServer((HOST, PORT), sksync.MyTCPHandler)
+        host, port = server.server_address
+        
+        # Start a thread with the server, in turn that thread will then start additional threads
+        # One additional thread for each client request/connection
+        server_thread = threading.Thread(target=server.serve_forever)
+        # Exit the server thread when the main thread terminates
+        server_thread.daemon = True
+        server_thread.start()
+        #print "Server loop running in thread:", server_thread.name
+        
+        # do sync
+        sksync.empty_client_paths(host, port, self.server_dir, self.client_dir)  # FIXME rename this function it is mis-named
+        server.shutdown()
+        
+        # check files exist
+        for filename in test_fixtures:
+            self.assertTrue(os.path.isfile(os.path.join(self.client_dir, filename)))
+            # No need to check if files compare with server versions as we compared server dir with fixture contents
+        
+            # check file contents
+            # check mtimes
+            check_file_contents_and_mtime(self.client_dir, filename)
+
+
 if __name__ == '__main__':
     unittest.main()
