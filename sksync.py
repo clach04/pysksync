@@ -184,6 +184,16 @@ class MyTCPHandler(SocketServer.BaseRequestHandler):
         self.request.sendall('\n')
 
 
+class MyTCPServer(SocketServer.TCPServer):
+    """Ensure CTRL-C followed by restart works without:
+             socket.error: [Errno 98] Address already in use
+    """
+    def __init__(self, *args, **kwargs):
+        self.allow_reuse_address = 1
+        SocketServer.TCPServer.__init__(self,  *args, **kwargs)
+        print 'self.allow_reuse_address', self.allow_reuse_address
+
+
 def run_server():
     """Implements SK Server, currently only supports:
        * non-recursive ONLY
@@ -197,7 +207,7 @@ def run_server():
     print HOST, PORT
     
     # Create the server, binding to localhost on port 9999
-    server = SocketServer.TCPServer((HOST, PORT), MyTCPHandler)
+    server = MyTCPServer((HOST, PORT), MyTCPHandler)
 
     # Activate the server; this will keep running until you
     # interrupt the program with Ctrl-C
