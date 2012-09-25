@@ -229,7 +229,8 @@ class MyTCPHandler(SocketServer.BaseRequestHandler):
         
 
         
-        # FIXME TODO now work out which files in file_list need to be sent to the client (as the client is missing them)
+        # send new files to the client
+        # TODO deal with incoming files from client
         logger.info('Number of files to send: %r' % len(server_files))
         current_dir = os.getcwd()  # TODO non-ascii; os.getcwdu()
         os.chdir(server_path)
@@ -282,7 +283,7 @@ def run_server():
     server.serve_forever()
 
 
-def empty_client_paths(ip, port, server_path, client_path):
+def client_start_sync(ip, port, server_path, client_path, sync_type=SKSYNC_PROTOCOL_TYPE_FROM_SERVER_USE_TIME):
     """Implements SK Client, currently only supports:
        * non-recursive ONLY
        * direction =  "from server (use time)" ONLY
@@ -313,7 +314,7 @@ def empty_client_paths(ip, port, server_path, client_path):
     assert response == SKSYNC_PROTOCOL_ESTABLISHED
 
     # type of sync
-    message = SKSYNC_PROTOCOL_TYPE_FROM_SERVER_USE_TIME
+    message = sync_type
     len_sent = s.send(message)
     logger.debug('sent: len %d %r' % (len_sent, message, ))
 
@@ -371,7 +372,7 @@ def run_client():
     host, port = 'localhost', SKSYNC_DEFAULT_PORT
     server_path, client_path = '/tmp/skmemos', '/tmp/skmemos_client'
     print host, port, server_path, client_path
-    empty_client_paths(host, port, server_path, client_path)
+    client_start_sync(host, port, server_path, client_path)
 
 
 def main(argv=None):

@@ -90,7 +90,7 @@ def perform_sync(server_dir, client_dir, HOST='127.0.0.1', PORT=sksync.SKSYNC_DE
     #print "Server loop running in thread:", server_thread.name
     
     # do sync
-    sksync.empty_client_paths(host, port, server_dir, client_dir)  # FIXME rename this function it is mis-named
+    sksync.client_start_sync(host, port, server_dir, client_dir)
     server.shutdown()
 
 
