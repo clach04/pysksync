@@ -191,7 +191,10 @@ class MyTCPServer(SocketServer.TCPServer):
     def __init__(self, *args, **kwargs):
         self.allow_reuse_address = 1
         SocketServer.TCPServer.__init__(self,  *args, **kwargs)
-        print 'self.allow_reuse_address', self.allow_reuse_address
+
+
+class MyThreadedTCPServer(SocketServer.ThreadingMixIn, MyTCPServer):
+    pass
 
 
 def run_server():
