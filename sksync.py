@@ -27,7 +27,7 @@ SKSYNC_PROTOCOL_TYPE_TO_SERVER_NO_TIME = '4\n'
 logging.basicConfig()
 logger = logging
 logger = logging.getLogger("sksync")
-logger.setLevel(logging.INFO)
+#logger.setLevel(logging.INFO)
 #logger.setLevel(logging.DEBUG)
 
 
@@ -171,17 +171,21 @@ class MyTCPHandler(SocketServer.BaseRequestHandler):
         file_list = get_file_list(server_path, include_size=True)
         # FIXME TODO now work out which files in file_list need to be sent to the client (as the client is missing them)
         logger.info('Number of files to send: %r' % len(file_list))
+        current_dir = os.getcwd()  # TODO non-ascii; os.getcwdu()
         os.chdir(server_path)
-        for filename, mtime, data_len in file_list:
-            file_details = '%s\n%d\n%d\n' % (filename, mtime, data_len)  # FIXME non-asci filenames
-            f = open(filename, 'rb')
-            data = f.read()
-            f.close()
-            self.request.send(file_details)
-            self.request.send(data)
+        try:
+            for filename, mtime, data_len in file_list:
+                file_details = '%s\n%d\n%d\n' % (filename, mtime, data_len)  # FIXME non-asci filenames
+                f = open(filename, 'rb')
+                data = f.read()
+                f.close()
+                self.request.send(file_details)
+                self.request.send(data)
 
-        # Tell client there are no files to send back
-        self.request.sendall('\n')
+            # Tell client there are no files to send back
+            self.request.sendall('\n')
+        finally:
+            os.chdir(current_dir)
 
 
 class MyTCPServer(SocketServer.TCPServer):
@@ -190,7 +194,7 @@ class MyTCPServer(SocketServer.TCPServer):
     """
     def __init__(self, *args, **kwargs):
         self.allow_reuse_address = 1
-        SocketServer.TCPServer.__init__(self,  *args, **kwargs)
+        SocketServer.TCPServer.__init__(self, *args, **kwargs)
 
 
 class MyThreadedTCPServer(SocketServer.ThreadingMixIn, MyTCPServer):
