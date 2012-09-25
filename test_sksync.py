@@ -165,7 +165,6 @@ class TestSKSync(unittest.TestCase):
             check_file_contents_and_mtime(self.client_dir, filename)
         # TODO check no other files exist in self.client_dir
 
-
     def test_sync_from_server_with_times_to_nonempty_client_directory_no_send(self):
         safe_rmtree(self.client_dir)
         safe_mkdir(self.client_dir)
