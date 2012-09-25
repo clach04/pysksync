@@ -10,6 +10,15 @@ import SocketServer
 import logging
 import glob
 
+try:
+    set
+except NameError:
+    # probably pre Python 2.4
+    #from sets import Set as set
+    import sets
+    set = sets.Set
+    frozenset = sets.ImmutableSet
+
 
 SKSYNC_DEFAULT_PORT = 23456
 #SKSYNC_DEFAULT_PORT = 23456 + 1  # FIXME DEBUG not default!!
@@ -44,6 +53,14 @@ def unnorm_mtime(m):
     """
     m = m / 1000  # NOTE still integer
     return m
+
+
+def parse_file_details(in_str):
+    mtime, filename =  in_str.split(' ', 1)
+    mtime =  norm_mtime(mtime)
+    assert filename.endswith('\n')
+    filename = filename[:-1]
+    return (filename, mtime)
 
 
 BIGBUF = 1024  # FIXME
@@ -165,9 +182,12 @@ class MyTCPHandler(SocketServer.BaseRequestHandler):
         # possible first file details
         response = reader.next()
         logger.debug('Received: %r' % response)
+        client_files = {}
         while response != '\n':
             # TODO start counting and other stats
-            # TODO read and ignore all file details....
+            # read all file details
+            filename, mtime = parse_file_details(response)
+            client_files[filename] = mtime
             response = reader.next()
             logger.debug('Received: %r' % response)
         
@@ -176,14 +196,46 @@ class MyTCPHandler(SocketServer.BaseRequestHandler):
         
         # TODO start counting and other stats
         # TODO output count and other stats
-        file_dict = get_file_listings(server_path, include_size=True, return_list=False)
+        server_files = get_file_listings(server_path, include_size=True, return_list=False)
+        
+        server_files_set = set(server_files)
+        client_files_set = set(client_files)
+
+        # if SKSYNC_PROTOCOL_TYPE_BIDIRECTIONAL_* or SKSYNC_PROTOCOL_TYPE_FROM_SERVER_
+        # files that are not on client
+        missing_from_client = server_files_set.difference(client_files_set)
+
+        common = server_files_set.intersection(client_files_set)
+        # Now find out if any common files are newer
+        fuzz_factor = 1  # one second
+        for filename in common:
+            server_mtime = server_files[filename][0]
+            client_mtime = client_files[filename]
+            mtime_diff = server_mtime - client_mtime
+            if mtime_diff >= fuzz_factor:
+                # if SKSYNC_PROTOCOL_TYPE_BIDIRECTIONAL_* or SKSYNC_PROTOCOL_TYPE_FROM_SERVER_
+                # 'server ahead'
+                missing_from_client.add(filename)
+            """
+            elif mtime_diff < -fuzz_factor:
+                print 'client ahead'
+            else:
+                # files same timestamp on client and server, do nothing
+                print 'client sever same'
+            """
+        
+        # if SKSYNC_PROTOCOL_TYPE_BIDIRECTIONAL_* or SKSYNC_PROTOCOL_TYPE_TO_SERVER_*
+        #missing_from_server = client_files_set.difference(server_files_set)
+        
+
+        
         # FIXME TODO now work out which files in file_list need to be sent to the client (as the client is missing them)
-        logger.info('Number of files to send: %r' % len(file_dict))
+        logger.info('Number of files to send: %r' % len(server_files))
         current_dir = os.getcwd()  # TODO non-ascii; os.getcwdu()
         os.chdir(server_path)
         try:
-            for filename in file_dict:
-                mtime, data_len = file_dict[filename]
+            for filename in missing_from_client:
+                mtime, data_len = server_files[filename]
                 file_details = '%s\n%d\n%d\n' % (filename, mtime, data_len)  # FIXME non-asci filenames
                 f = open(filename, 'rb')
                 data = f.read()
