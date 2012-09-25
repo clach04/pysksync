@@ -14,8 +14,6 @@ import unittest
 import sksync
 
 
-HOST, PORT = '127.0.0.1', sksync.SKSYNC_DEFAULT_PORT  # local only consider using a random port (or at least non-default)
-
 test_fixtures = {
     'test1.txt': (1345316082.71875, '1'),
     'test2.txt': (1345316082.71875 - 12, '2'),
@@ -75,6 +73,25 @@ def create_test_files(testdir='tmp_testsuitedir'):
         os.utime(filename, (mtime, mtime))
 
 
+def perform_sync(server_dir, client_dir, HOST='127.0.0.1', PORT=sksync.SKSYNC_DEFAULT_PORT):
+    
+    # Start sync server in thread
+    server = sksync.MyThreadedTCPServer((HOST, PORT), sksync.MyTCPHandler)
+    host, port = server.server_address
+    
+    # Start a thread with the server, in turn that thread will then start additional threads
+    # One additional thread for each client request/connection
+    server_thread = threading.Thread(target=server.serve_forever)
+    # Exit the server thread when the main thread terminates
+    server_thread.daemon = True
+    server_thread.start()
+    #print "Server loop running in thread:", server_thread.name
+    
+    # do sync
+    sksync.empty_client_paths(host, port, server_dir, client_dir)  # FIXME rename this function it is mis-named
+    server.shutdown()
+
+
 class TestSKSync(unittest.TestCase):
     
     def setUp(self):
@@ -103,22 +120,8 @@ class TestSKSync(unittest.TestCase):
         check_file_contents_and_mtime(self.server_dir, 'test2.txt')
         check_file_contents_and_mtime(self.server_dir, 'test3.txt')
 
-        # Start sync server in thread
-        
-        server = sksync.MyThreadedTCPServer((HOST, PORT), sksync.MyTCPHandler)
-        host, port = server.server_address
-        
-        # Start a thread with the server, in turn that thread will then start additional threads
-        # One additional thread for each client request/connection
-        server_thread = threading.Thread(target=server.serve_forever)
-        # Exit the server thread when the main thread terminates
-        server_thread.daemon = True
-        server_thread.start()
-        #print "Server loop running in thread:", server_thread.name
-        
         # do sync
-        sksync.empty_client_paths(host, port, self.server_dir, self.client_dir)  # FIXME rename this function it is mis-named
-        server.shutdown()
+        perform_sync(self.server_dir, self.client_dir)
         
         # check files exist
         self.assertTrue(os.path.isfile(os.path.join(self.client_dir, 'test1.txt')))
@@ -132,7 +135,6 @@ class TestSKSync(unittest.TestCase):
         check_file_contents_and_mtime(self.client_dir, 'test1.txt')
         check_file_contents_and_mtime(self.client_dir, 'test2.txt')
         check_file_contents_and_mtime(self.client_dir, 'test3.txt')
-
 
     def test_sync_from_server_with_times_to_empty_client_directory_dynamic(self):
         safe_rmtree(self.client_dir)
@@ -149,22 +151,8 @@ class TestSKSync(unittest.TestCase):
 
             check_file_contents_and_mtime(self.server_dir, filename)
 
-        # Start sync server in thread
-        
-        server = sksync.MyThreadedTCPServer((HOST, PORT), sksync.MyTCPHandler)
-        host, port = server.server_address
-        
-        # Start a thread with the server, in turn that thread will then start additional threads
-        # One additional thread for each client request/connection
-        server_thread = threading.Thread(target=server.serve_forever)
-        # Exit the server thread when the main thread terminates
-        server_thread.daemon = True
-        server_thread.start()
-        #print "Server loop running in thread:", server_thread.name
-        
         # do sync
-        sksync.empty_client_paths(host, port, self.server_dir, self.client_dir)  # FIXME rename this function it is mis-named
-        server.shutdown()
+        perform_sync(self.server_dir, self.client_dir)
         
         # check files exist
         for filename in test_fixtures:
