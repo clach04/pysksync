@@ -232,6 +232,12 @@ class TestSKSync(unittest.TestCase):
             self.assertEqual(test_string, data, 'server clobbered client file %r' % filename)
         # TODO check no other files exist in self.client_dir
 
+try:
+    TestSKSync.assertTrue
+except AttributeError:
+    # wow, old unittest
+    TestSKSync.assertTrue = TestSKSync.assert_
+    TestSKSync.assertFalse = TestSKSync.failIf
 
 if __name__ == '__main__':
     unittest.main()
