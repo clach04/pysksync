@@ -32,6 +32,9 @@ SKSYNC_PROTOCOL_TYPE_BIDIRECTIONAL_NO_TIME = '3\n'
 SKSYNC_PROTOCOL_TYPE_TO_SERVER_USE_TIME = '1\n'
 SKSYNC_PROTOCOL_TYPE_TO_SERVER_NO_TIME = '4\n'
 
+SKSYNC_PROTOCOL_RECURSIVE = '0\n'
+SKSYNC_PROTOCOL_NON_RECURSIVE = '1\n'
+
 
 logging.basicConfig()
 logger = logging
@@ -168,7 +171,7 @@ class MyTCPHandler(SocketServer.BaseRequestHandler):
 
         response = reader.next()
         logger.debug('Received: %r' % response)
-        assert response == '0\n'  # start of path (+file) info
+        assert response == SKSYNC_PROTOCOL_NON_RECURSIVE  # start of path (+file) info
 
         server_path = reader.next()
         logger.debug('server_path: %r' % server_path)
@@ -322,9 +325,9 @@ def client_start_sync(ip, port, server_path, client_path, sync_type=SKSYNC_PROTO
     # example: '0\n/tmp/skmemos\n/sdcard/skmemos\n\n'
     if file_list_str:
         # FIXME this could be refactored....
-        message = '0\n' + server_path + '\n' + client_path + '\n' + file_list_str + '\n\n'
+        message = SKSYNC_PROTOCOL_NON_RECURSIVE + server_path + '\n' + client_path + '\n' + file_list_str + '\n\n'
     else:
-        message = '0\n' + server_path + '\n' + client_path + '\n\n'
+        message = SKSYNC_PROTOCOL_NON_RECURSIVE + server_path + '\n' + client_path + '\n\n'
     len_sent = s.send(message)
     logger.debug('sent: len %d %r' % (len_sent, message, ))
 

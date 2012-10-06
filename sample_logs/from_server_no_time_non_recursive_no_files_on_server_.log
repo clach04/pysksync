@@ -1,0 +1,14 @@
+Sat Oct  6 14:48:47 2012:Redirecting: localhost:23456 -> localhost:23457
+Sat Oct  6 14:48:49 2012:Creating new session for CLIENT 52961 
+Sat Oct  6 14:48:49 2012:Creating new pipe thread  <PipeThread(Thread-2, initial)> ( ('CLIENT', 52961) -> ('SERVER', 23457) )
+Sat Oct  6 14:48:49 2012:1 pipes active
+Sat Oct  6 14:48:49 2012:Creating new pipe thread  <PipeThread(Thread-3, initial)> ( ('SERVER', 23457) -> ('CLIENT', 52961) )
+Sat Oct  6 14:48:49 2012:2 pipes active
+Sat Oct  6 14:48:49 2012:( ('CLIENT', 52961) -> ('SERVER', 23457) ) DATA!'sksync 1\n'
+Sat Oct  6 14:48:49 2012:( ('SERVER', 23457) -> ('CLIENT', 52961) ) DATA!'P'
+Sat Oct  6 14:48:49 2012:( ('SERVER', 23457) -> ('CLIENT', 52961) ) DATA!'rotocol Established\n'
+Sat Oct  6 14:48:49 2012:( ('CLIENT', 52961) -> ('SERVER', 23457) ) DATA!'5\n'
+Sat Oct  6 14:48:49 2012:( ('CLIENT', 52961) -> ('SERVER', 23457) ) DATA!'1\n/tmp/skmemos\n/sdcard/skmemos\n1345316070000 test2.txt\n1345316082000 test1.txt\n1345316010000 test3.txt\n\n'
+Sat Oct  6 14:48:49 2012:( ('SERVER', 23457) -> ('CLIENT', 52961) ) DATA!'\n\n'
+Sat Oct  6 14:48:49 2012:<PipeThread(Thread-3, started -1236399248)> terminating
+Sat Oct  6 14:48:49 2012:1 pipes active
