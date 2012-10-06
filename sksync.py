@@ -171,7 +171,14 @@ class MyTCPHandler(SocketServer.BaseRequestHandler):
 
         response = reader.next()
         logger.debug('Received: %r' % response)
-        assert response == SKSYNC_PROTOCOL_NON_RECURSIVE  # start of path (+file) info
+        assert response in (SKSYNC_PROTOCOL_NON_RECURSIVE, SKSYNC_PROTOCOL_RECURSIVE)  # start of path (+file) info
+        
+        if response == SKSYNC_PROTOCOL_NON_RECURSIVE:
+            recursive = False
+        else:
+            # SKSYNC_PROTOCOL_RECURSIVE
+            recursive = True
+        
 
         server_path = reader.next()
         logger.debug('server_path: %r' % server_path)
@@ -199,7 +206,7 @@ class MyTCPHandler(SocketServer.BaseRequestHandler):
         
         # TODO start counting and other stats
         # TODO output count and other stats
-        server_files = get_file_listings(server_path, include_size=True, return_list=False)
+        server_files = get_file_listings(server_path, recursive=recursive, include_size=True, return_list=False)
         
         server_files_set = set(server_files)
         client_files_set = set(client_files)
@@ -286,16 +293,19 @@ def run_server():
     server.serve_forever()
 
 
-def client_start_sync(ip, port, server_path, client_path, sync_type=SKSYNC_PROTOCOL_TYPE_FROM_SERVER_USE_TIME):
+def client_start_sync(ip, port, server_path, client_path, sync_type=SKSYNC_PROTOCOL_TYPE_FROM_SERVER_USE_TIME, recursive=False):
     """Implements SK Client, currently only supports:
        * non-recursive ONLY
        * direction =  "from server (use time)" ONLY
     """
+    if recursive:
+        raise NotImplementedError('recursive')
+
     real_client_path = os.path.abspath(client_path)
     file_list_str = ''
     
     # TODO recursion
-    file_list = get_file_listings(real_client_path)
+    file_list = get_file_listings(real_client_path, recursive=recursive)
     file_list_info = []
     for filename, mtime in file_list:
         file_details = '%d %s' % (mtime, filename)
@@ -320,14 +330,18 @@ def client_start_sync(ip, port, server_path, client_path, sync_type=SKSYNC_PROTO
     message = sync_type
     len_sent = s.send(message)
     logger.debug('sent: len %d %r' % (len_sent, message, ))
-
+    
+    recursive_type = SKSYNC_PROTOCOL_NON_RECURSIVE
+    if recursive:
+        recursive_type = SKSYNC_PROTOCOL_RECURSIVE
+    
     # type of sync? and folders to sync (server path, client path)
     # example: '0\n/tmp/skmemos\n/sdcard/skmemos\n\n'
     if file_list_str:
         # FIXME this could be refactored....
-        message = SKSYNC_PROTOCOL_NON_RECURSIVE + server_path + '\n' + client_path + '\n' + file_list_str + '\n\n'
+        message = recursive_type + server_path + '\n' + client_path + '\n' + file_list_str + '\n\n'
     else:
-        message = SKSYNC_PROTOCOL_NON_RECURSIVE + server_path + '\n' + client_path + '\n\n'
+        message = recursive_type + server_path + '\n' + client_path + '\n\n'
     len_sent = s.send(message)
     logger.debug('sent: len %d %r' % (len_sent, message, ))
 
