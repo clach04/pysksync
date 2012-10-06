@@ -125,6 +125,9 @@ def path_walker(path_to_search, filename_filter=None, abspath=False):
     
     if filename_filter is None:
         filename_filter = always_true
+    
+    path_to_search_len = len(path_to_search) + 1
+    
     ## Requires os.walk (python 2.3 and later).
     ## Pure Python versions for earlier versions available from:
     ##  http://osdir.com/ml/lang.jython.user/2006-04/msg00032.html
@@ -134,6 +137,8 @@ def path_walker(path_to_search, filename_filter=None, abspath=False):
         for temp_filename in filenames:
             if filename_filter(temp_filename):
                 temp_filename = os.path.join(dirpath, temp_filename)
+                if not abspath:
+                    temp_filename = temp_filename[path_to_search_len:]
                 yield temp_filename
 
 ###############################################################
@@ -143,15 +148,17 @@ def get_file_listings(path_of_files, recursive=False, include_size=False, return
     """
     
     if recursive:
-        raise NotImplementedError('recursive')
-    
+        file_list = list(path_walker(path_of_files))
     current_dir = os.getcwd()  # TODO non-ascii; os.getcwdu()
-    # TODO include file size param
-    # TODO recursive param
-    # Get non-recursive list of files in real_client_path
-    # FIXME TODO nasty hack using glob (i.e. not robust)
     os.chdir(path_of_files)  # TODO non-ascii path names
-    file_list = glob.glob('*')
+
+    if not recursive:
+        # TODO include file size param
+        # TODO recursive param
+        # Get non-recursive list of files in real_client_path
+        # FIXME TODO nasty hack using glob (i.e. not robust)
+        file_list = glob.glob('*')
+    
     if return_list:
         listings_result = []
     else:
@@ -302,7 +309,6 @@ class MyThreadedTCPServer(SocketServer.ThreadingMixIn, MyTCPServer):
 
 def run_server():
     """Implements SK Server, currently only supports:
-       * non-recursive ONLY
        * direction =  "from server (use time)" ONLY
        * TODO add option for server to filter/restrict server path
          (this is not a normal SK Sync option)
@@ -322,12 +328,8 @@ def run_server():
 
 def client_start_sync(ip, port, server_path, client_path, sync_type=SKSYNC_PROTOCOL_TYPE_FROM_SERVER_USE_TIME, recursive=False):
     """Implements SK Client, currently only supports:
-       * non-recursive ONLY
        * direction =  "from server (use time)" ONLY
     """
-    if recursive:
-        raise NotImplementedError('recursive')
-
     real_client_path = os.path.abspath(client_path)
     file_list_str = ''
     
