@@ -94,6 +94,25 @@ def perform_sync(server_dir, client_dir, HOST='127.0.0.1', PORT=sksync.SKSYNC_DE
     server.shutdown()
 
 
+class TestFileWalk(unittest.TestCase):
+    def setUp(self):
+        # NOTE using Python unittest, setUp() is called before EACH and every
+        self.test_dir = os.path.join('tmp_testsuitedir', 'walk')
+        create_test_files(testdir=self.test_dir)
+        sub_test_dir = os.path.join(self.test_dir, 'subdir1')
+        create_test_files(testdir=sub_test_dir)
+    
+    def test_non_recursive_dir(self):
+        file_list = sksync.get_file_listings(self.test_dir, recursive=False, include_size=True, return_list=True)
+        canon = [('test3.txt', 1345316010000L, 1L), ('test1.txt', 1345316082000L, 1L), ('test2.txt', 1345316070000L, 1L)]
+        self.assertEqual(canon, file_list)
+
+    def test_recursive_dir(self):
+        file_list = sksync.get_file_listings(self.test_dir, recursive=True, include_size=True, return_list=True)
+        canon = []  # TODO
+        self.assertEqual(canon, file_list)
+
+
 class TestSKSync(unittest.TestCase):
     
     def setUp(self):

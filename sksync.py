@@ -59,8 +59,8 @@ def unnorm_mtime(m):
 
 
 def parse_file_details(in_str):
-    mtime, filename =  in_str.split(' ', 1)
-    mtime =  norm_mtime(mtime)
+    mtime, filename = in_str.split(' ', 1)
+    mtime = norm_mtime(mtime)
     assert filename.endswith('\n')
     filename = filename[:-1]
     return (filename, mtime)
@@ -115,6 +115,10 @@ class SKBufferedSocket(object):
 def get_file_listings(path_of_files, recursive=False, include_size=False, return_list=True):
     """return_list=True, if False returns dict
     """
+    
+    if recursive:
+        raise NotImplementedError('recursive')
+    
     current_dir = os.getcwd()  # TODO non-ascii; os.getcwdu()
     # TODO include file size param
     # TODO recursive param
@@ -179,7 +183,6 @@ class MyTCPHandler(SocketServer.BaseRequestHandler):
             # SKSYNC_PROTOCOL_RECURSIVE
             recursive = True
         
-
         server_path = reader.next()
         logger.debug('server_path: %r' % server_path)
         server_path = server_path[:-1]  # loose trailing \n
@@ -236,8 +239,6 @@ class MyTCPHandler(SocketServer.BaseRequestHandler):
         
         # if SKSYNC_PROTOCOL_TYPE_BIDIRECTIONAL_* or SKSYNC_PROTOCOL_TYPE_TO_SERVER_*
         #missing_from_server = client_files_set.difference(server_files_set)
-        
-
         
         # send new files to the client
         # TODO deal with incoming files from client
