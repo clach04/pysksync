@@ -112,6 +112,32 @@ class SKBufferedSocket(object):
                 raise StopIteration
 
 
+###############################################################
+
+def path_walker(path_to_search, filename_filter=None, abspath=False):
+    """Walk directory of files, directory depth first, returns generator
+    """
+    if abspath:
+        path_to_search = os.path.abspath(path_to_search)
+    def always_true(*args, **kwargs):
+        # Use a function rather than Lamda
+        return True
+    
+    if filename_filter is None:
+        filename_filter = always_true
+    ## Requires os.walk (python 2.3 and later).
+    ## Pure Python versions for earlier versions available from:
+    ##  http://osdir.com/ml/lang.jython.user/2006-04/msg00032.html
+    ## but lacks "topdown" support, walk class later
+    for dirpath, dirnames, filenames in os.walk(path_to_search, topdown=False):
+        filenames.sort()
+        for temp_filename in filenames:
+            if filename_filter(temp_filename):
+                temp_filename = os.path.join(dirpath, temp_filename)
+                yield temp_filename
+
+###############################################################
+
 def get_file_listings(path_of_files, recursive=False, include_size=False, return_list=True):
     """return_list=True, if False returns dict
     """

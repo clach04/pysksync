@@ -106,10 +106,27 @@ class TestFileWalk(unittest.TestCase):
         file_list = sksync.get_file_listings(self.test_dir, recursive=False, include_size=True, return_list=True)
         canon = [('test3.txt', 1345316010000L, 1L), ('test1.txt', 1345316082000L, 1L), ('test2.txt', 1345316070000L, 1L)]
         self.assertEqual(canon, file_list)
-
-    def test_recursive_dir(self):
+    
+    def test_recursive_dir1(self):
+        file_list = list(sksync.path_walker(self.test_dir))
+        canon = [os.path.join(self.test_dir, 'subdir1', 'test1.txt'),
+                os.path.join(self.test_dir, 'subdir1', 'test2.txt'),
+                os.path.join(self.test_dir, 'subdir1', 'test3.txt'),
+                os.path.join(self.test_dir, 'test1.txt'),
+                os.path.join(self.test_dir, 'test2.txt'),
+                os.path.join(self.test_dir, 'test3.txt'),
+                ]
+        self.assertEqual(canon, file_list)
+    
+    def test_recursive_dir2(self):
         file_list = sksync.get_file_listings(self.test_dir, recursive=True, include_size=True, return_list=True)
-        canon = []  # TODO
+        canon = [os.path.join(self.test_dir, 'subdir1', 'test1.txt'),
+                os.path.join(self.test_dir, 'subdir1', 'test2.txt'),
+                os.path.join(self.test_dir, 'subdir1', 'test3.txt'),
+                os.path.join(self.test_dir, 'test1.txt'),
+                os.path.join(self.test_dir, 'test2.txt'),
+                os.path.join(self.test_dir, 'test3.txt'),
+                ]
         self.assertEqual(canon, file_list)
 
 
