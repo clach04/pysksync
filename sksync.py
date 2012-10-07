@@ -345,7 +345,7 @@ class MyTCPHandler(SocketServer.BaseRequestHandler):
         
         # send new files to the client
         # TODO deal with incoming files from client
-        logger.info('Number of files to send %r out of ' % (len(missing_from_client), len(server_files)))
+        logger.info('Number of files to send %r out of %r ' % (len(missing_from_client), len(server_files)))
         # TODO consider a progress bar/percent base on number of missing files (not byte count)
         current_dir = os.getcwd()  # TODO non-ascii; os.getcwdu()
         os.chdir(server_path)
