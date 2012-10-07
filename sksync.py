@@ -9,7 +9,7 @@ import socket
 import SocketServer
 import logging
 import glob
-
+import errno
 try:
     set
 except NameError:
@@ -42,6 +42,16 @@ logger = logging.getLogger("sksync")
 #logger.setLevel(logging.INFO)
 #logger.setLevel(logging.DEBUG)
 
+
+def safe_mkdir(newdir):
+    result_dir = os.path.abspath(newdir)
+    try:
+        os.makedirs(result_dir)
+    except OSError, info:
+        if info.errno == errno.EEXIST and os.path.isdir(result_dir):
+            pass
+        else:
+            raise
 
 # norm/unnorm have not been tested....
 def norm_mtime(m):
@@ -119,6 +129,7 @@ def path_walker(path_to_search, filename_filter=None, abspath=False):
     """
     if abspath:
         path_to_search = os.path.abspath(path_to_search)
+    
     def always_true(*args, **kwargs):
         # Use a function rather than Lamda
         return True
@@ -401,6 +412,9 @@ def client_start_sync(ip, port, server_path, client_path, sync_type=SKSYNC_PROTO
         logger.debug('filecontents: %r' % filecontents)
         
         full_filename = os.path.join(real_client_path, filename)
+        full_filename_dir = os.path.dirname(full_filename)
+        #if not exists full_filename_dir
+        safe_mkdir(full_filename_dir)
         f = open(full_filename, 'wb')
         f.write(filecontents)
         f.close()

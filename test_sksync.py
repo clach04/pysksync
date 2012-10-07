@@ -12,24 +12,13 @@ import unittest
 
 
 import sksync
-
+safe_mkdir = sksync.safe_mkdir
 
 test_fixtures = {
     'test1.txt': (1345316082.71875, '1'),
     'test2.txt': (1345316082.71875 - 12, '2'),
     'test3.txt': (1345316082.71875 - 72, '3'),
 }
-
-
-def safe_mkdir(newdir):
-    result_dir = os.path.abspath(newdir)
-    try:
-        os.makedirs(result_dir)
-    except OSError, info:
-        if info.errno == errno.EEXIST and os.path.isdir(result_dir):
-            pass
-        else:
-            raise
 
 
 def safe_rmtree(testdir):
