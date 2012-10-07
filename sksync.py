@@ -246,6 +246,9 @@ class MyTCPHandler(SocketServer.BaseRequestHandler):
             # TODO start counting and other stats
             # read all file details
             filename, mtime = parse_file_details(response)
+            if os.path.sep == '\\':
+                # Windows
+                filename = filename.replace('/', '\\')  # Unix path conversion to Windows
             client_files[filename] = mtime
             response = reader.next()
             logger.debug('Received: %r' % response)
@@ -291,20 +294,30 @@ class MyTCPHandler(SocketServer.BaseRequestHandler):
         logger.info('Number of files to send: %r' % len(server_files))
         current_dir = os.getcwd()  # TODO non-ascii; os.getcwdu()
         os.chdir(server_path)
+        sent_count = 0
         try:
             for filename in missing_from_client:
+                logger.debug('File to send: %r', filename)
                 mtime, data_len = server_files[filename]
-                file_details = '%s\n%d\n%d\n' % (filename, mtime, data_len)  # FIXME non-asci filenames
+                if os.path.sep == '\\':
+                    # Windows path conversion to Unix/protocol
+                    send_filename = filename.replace('\\', '/')
+                else:
+                    send_filename = filename
+                file_details = '%s\n%d\n%d\n' % (send_filename, mtime, data_len)  # FIXME non-asci filenames
+                logger.debug('file_details: %r', file_details)
                 f = open(filename, 'rb')
                 data = f.read()
                 f.close()
                 self.request.send(file_details)
                 self.request.send(data)
+                sent_count += 1
 
             # Tell client there are no files to send back
             self.request.sendall('\n')
         finally:
             os.chdir(current_dir)
+        logger.info('Successfully checked %r, set sent %r files', len(server_files), sent_count)
 
 
 class StoppableTCPServer(SocketServer.ThreadingTCPServer):
@@ -498,10 +511,11 @@ def main(argv=None):
     if argv is None:
         argv = sys.argv
     
-    if 'server' in argv:
-        run_server()
-    else:
+    logger.setLevel(logging.INFO)
+    if 'client' in argv:
         run_client()
+    else:
+        run_server()
     
     return 0
 
