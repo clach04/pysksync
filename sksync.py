@@ -12,6 +12,14 @@ import select
 import logging
 import glob
 import errno
+
+try:
+    #raise ImportError ## Debug, pretend we are 2.3 and earlier
+    from datetime import timedelta, datetime
+except ImportError:
+    import time
+    datetime=None
+
 try:
     set
 except NameError:
@@ -54,6 +62,48 @@ def safe_mkdir(newdir):
             pass
         else:
             raise
+
+def gettime():
+    # orig
+    if datetime:
+        return datetime.now()
+    else:
+        return time.time()
+    
+    # supposed to have better granularity for sub second
+    """
+    # choose timer to use
+    if sys.platform.startswith('win'):
+        default_timer = time.clock
+    else:
+        default_timer = time.time
+
+    return default_timer()
+    """
+
+class SimpleTimer(object):
+    def __init__(self):
+        self._start = None
+        self._stop = None
+        self.timediff = None
+        self.num_secs = None
+    
+    def start(self):
+        self._start = gettime()
+    
+    def stop(self):
+        self._stop = gettime()
+        self.timediff = self._stop - self._start
+        if datetime:
+            timediff = self.timediff
+            if isinstance(timediff, timedelta):
+                self.num_secs = timediff.days * 3600 * 24 + timediff.seconds + (timediff.microseconds / 1000000.0)
+        #print type(self.timediff)
+        #print type(self.num_secs)
+    
+    def __str__(self):
+        #return stringify(self.num_secs)
+        return '%d secs' % self.num_secs
 
 # norm/unnorm have not been tested....
 def norm_mtime(m):
@@ -204,6 +254,10 @@ class MyTCPHandler(SocketServer.BaseRequestHandler):
     """
 
     def handle(self):
+        logger.info('Client connected')
+        sync_timer = SimpleTimer()
+        sync_timer.start()
+        
         # self.request is the TCP socket connected to the client
         reader = SKBufferedSocket(self.request)
         response = reader.next()
@@ -291,7 +345,8 @@ class MyTCPHandler(SocketServer.BaseRequestHandler):
         
         # send new files to the client
         # TODO deal with incoming files from client
-        logger.info('Number of files to send: %r' % len(server_files))
+        logger.info('Number of files to send %r out of ' % (len(missing_from_client), len(server_files)))
+        # TODO consider a progress bar/percent base on number of missing files (not byte count)
         current_dir = os.getcwd()  # TODO non-ascii; os.getcwdu()
         os.chdir(server_path)
         sent_count = 0
@@ -317,7 +372,8 @@ class MyTCPHandler(SocketServer.BaseRequestHandler):
             self.request.sendall('\n')
         finally:
             os.chdir(current_dir)
-        logger.info('Successfully checked %r, set sent %r files', len(server_files), sent_count)
+        sync_timer.stop()
+        logger.info('Successfully checked %r, set sent %r files in %s', len(server_files), sent_count, sync_timer)
 
 
 class StoppableTCPServer(SocketServer.ThreadingTCPServer):
