@@ -75,23 +75,25 @@ def create_test_files(testdir='tmp_testsuitedir', data_override=None):
         os.utime(filename, (mtime, mtime))
 
 
-def perform_sync(server_dir, client_dir, HOST='127.0.0.1', PORT=sksync.SKSYNC_DEFAULT_PORT):
+def perform_sync(server_dir, client_dir, HOST='127.0.0.1', PORT=sksync.SKSYNC_DEFAULT_PORT, recursive=False):
     
     # Start sync server in thread
     server = sksync.MyThreadedTCPServer((HOST, PORT), sksync.MyTCPHandler)
-    host, port = server.server_address
-    
-    # Start a thread with the server, in turn that thread will then start additional threads
-    # One additional thread for each client request/connection
-    server_thread = threading.Thread(target=server.serve_forever)
-    # Exit the server thread when the main thread terminates
-    server_thread.daemon = True
-    server_thread.start()
-    #print "Server loop running in thread:", server_thread.name
-    
-    # do sync
-    sksync.client_start_sync(host, port, server_dir, client_dir)
-    server.shutdown()
+    try:
+        host, port = server.server_address
+        
+        # Start a thread with the server, in turn that thread will then start additional threads
+        # One additional thread for each client request/connection
+        server_thread = threading.Thread(target=server.serve_forever)
+        # Exit the server thread when the main thread terminates
+        server_thread.daemon = True
+        server_thread.start()
+        #print "Server loop running in thread:", server_thread.name
+        
+        # do sync
+        sksync.client_start_sync(host, port, server_dir, client_dir, recursive=recursive)
+    finally:
+        server.shutdown()
 
 
 class TestFileWalk(unittest.TestCase):
@@ -137,7 +139,8 @@ class TestSKSync(unittest.TestCase):
         self.server_dir = os.path.join('tmp_testsuitedir', 'server')
         self.client_dir = os.path.join('tmp_testsuitedir', 'client')
         create_test_files(testdir=self.server_dir)
-        pass
+        safe_rmtree(self.client_dir)
+        safe_mkdir(self.client_dir)
     
     def test_sync_from_server_with_times_to_empty_client_directory(self):
         safe_rmtree(self.client_dir)
@@ -268,6 +271,52 @@ class TestSKSync(unittest.TestCase):
             self.assertEqual(test_string, data, 'server clobbered client file %r' % filename)
         # TODO check no other files exist in self.client_dir
 
+    def test_sync_from_server_with_times_to_empty_client_directory_recursive(self):
+        safe_rmtree(self.client_dir)
+        safe_mkdir(self.client_dir)
+        server_sub_test_dir = os.path.join(self.server_dir, 'subdir1')
+        sub_test_dir = os.path.join(self.client_dir, 'subdir1')
+        create_test_files(testdir=server_sub_test_dir)
+
+        result = os.path.isdir(self.server_dir)
+        
+        # for easy of reading - explictly document/check each file
+        # rather than looping through fixtures
+        self.assertTrue(os.path.isfile(os.path.join(self.server_dir, 'test1.txt')))
+        self.assertTrue(os.path.isfile(os.path.join(self.server_dir, 'test2.txt')))
+        self.assertTrue(os.path.isfile(os.path.join(self.server_dir, 'test3.txt')))
+        
+        self.assertFalse(os.path.isfile(os.path.join(self.client_dir, 'test1.txt')))
+        self.assertFalse(os.path.isfile(os.path.join(self.client_dir, 'test2.txt')))
+        self.assertFalse(os.path.isfile(os.path.join(self.client_dir, 'test3.txt')))
+
+        check_file_contents_and_mtime(self.server_dir, 'test1.txt')
+        check_file_contents_and_mtime(self.server_dir, 'test2.txt')
+        check_file_contents_and_mtime(self.server_dir, 'test3.txt')
+
+        # do sync
+        perform_sync(self.server_dir, self.client_dir, recursive=True)
+        #x = raw_input('pausned')
+        
+        # check files exist
+        self.assertTrue(os.path.isfile(os.path.join(self.client_dir, 'test1.txt')))
+        self.assertTrue(os.path.isfile(os.path.join(self.client_dir, 'test2.txt')))
+        self.assertTrue(os.path.isfile(os.path.join(self.client_dir, 'test3.txt')))
+        self.assertTrue(os.path.isfile(os.path.join(sub_test_dir, 'test1.txt')))
+        self.assertTrue(os.path.isfile(os.path.join(sub_test_dir, 'test2.txt')))
+        self.assertTrue(os.path.isfile(os.path.join(sub_test_dir, 'test3.txt')))
+        
+        # No need to check if files compare with server versions as we compared server dir with fixture contents
+        
+        # check file contents
+        # check mtimes
+        check_file_contents_and_mtime(self.client_dir, 'test1.txt')
+        check_file_contents_and_mtime(self.client_dir, 'test2.txt')
+        check_file_contents_and_mtime(self.client_dir, 'test3.txt')
+        check_file_contents_and_mtime(sub_test_dir, 'test1.txt')
+        check_file_contents_and_mtime(sub_test_dir, 'test2.txt')
+        check_file_contents_and_mtime(sub_test_dir, 'test3.txt')
+        # TODO check no other files exist in self.client_dir
 try:
     TestSKSync.assertTrue
 except AttributeError:
