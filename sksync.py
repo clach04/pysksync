@@ -254,7 +254,7 @@ class MyTCPHandler(SocketServer.BaseRequestHandler):
     """
 
     def handle(self):
-        logger.info('Client connected')
+        logger.info('Client %r connected' % (self.request.getpeername(),))
         sync_timer = SimpleTimer()
         sync_timer.start()
         
@@ -312,7 +312,9 @@ class MyTCPHandler(SocketServer.BaseRequestHandler):
         
         # TODO start counting and other stats
         # TODO output count and other stats
+        logger.info('Number of files on client %r ' % (len(client_files),))
         server_files = get_file_listings(server_path, recursive=recursive, include_size=True, return_list=False)
+        logger.info('Number of files on server %r ' % (len(server_files),))
         
         server_files_set = set(server_files)
         client_files_set = set(client_files)
@@ -345,7 +347,7 @@ class MyTCPHandler(SocketServer.BaseRequestHandler):
         
         # send new files to the client
         # TODO deal with incoming files from client
-        logger.info('Number of files to send %r out of %r ' % (len(missing_from_client), len(server_files)))
+        logger.info('Number of files for server to send %r out of %r ' % (len(missing_from_client), len(server_files)))
         # TODO consider a progress bar/percent base on number of missing files (not byte count)
         current_dir = os.getcwd()  # TODO non-ascii; os.getcwdu()
         os.chdir(server_path)
@@ -374,6 +376,7 @@ class MyTCPHandler(SocketServer.BaseRequestHandler):
             os.chdir(current_dir)
         sync_timer.stop()
         logger.info('Successfully checked %r, set sent %r files in %s', len(server_files), sent_count, sync_timer)
+        logger.info('Client %r disconnected' % (self.request.getpeername(),))
 
 
 class StoppableTCPServer(SocketServer.ThreadingTCPServer):

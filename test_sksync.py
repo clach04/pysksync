@@ -314,4 +314,6 @@ except AttributeError:
     TestSKSync.assertFalse = TestSKSync.failIf
 
 if __name__ == '__main__':
+    #sksync.logger.setLevel(sksync.logging.INFO)  # Debug
+    #sksync.logger.setLevel(sksync.logging.DEBUG)  # Debug
     unittest.main()
