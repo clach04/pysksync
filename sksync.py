@@ -29,6 +29,39 @@ except NameError:
     set = sets.Set
     frozenset = sets.ImmutableSet
 
+# json support, TODO consider http://pypi.python.org/pypi/omnijson
+try:
+    # Python 2.6+
+    import json
+except ImportError:
+    try:
+        # from http://code.google.com/p/simplejson
+        import simplejson as json
+    except ImportError:
+        json = None
+
+if json is None:
+    
+    def dump_json(x, indent=None):
+        """dumb not safe!
+        Works for the purposes of this specific script as quotes never
+        appear in data set.
+        
+        Parameter indent ignored"""
+        if indent:
+            result = pprint.pformat(x, indent)
+        else:
+            result = repr(x).replace("'", '"')
+        return result
+    
+    def load_json(x):
+        """dumb not safe! Works for the purposes of this specific script"""
+        x = x.replace('\r', '')
+        return eval(x)
+else:
+    dump_json = json.dumps
+    load_json = json.loads
+
 
 SKSYNC_DEFAULT_PORT = 23456
 #SKSYNC_DEFAULT_PORT = 23456 + 1  # FIXME DEBUG not default!!
@@ -449,19 +482,19 @@ class MyThreadedTCPServer(SocketServer.ThreadingMixIn, MyTCPServer):
     pass
 
 
-def run_server():
+def run_server(config):
     """Implements SK Server, currently only supports:
        * direction =  "from server (use time)" ONLY
        * TODO add option for server to filter/restrict server path
          (this is not a normal SK Sync option)
     """
 
-    HOST, PORT = '0.0.0.0', SKSYNC_DEFAULT_PORT
-    
-    print HOST, PORT
-    
+    host, port = config['host'], config['port']
+
+    logger.info('starting server: %r', (host, port))
+
     # Create the server, binding to localhost on port 9999
-    server = MyTCPServer((HOST, PORT), MyTCPHandler)
+    server = MyTCPServer((host, port), MyTCPHandler)
 
     # Activate the server; this will keep running until you
     # interrupt the program with Ctrl-C
@@ -559,8 +592,11 @@ def client_start_sync(ip, port, server_path, client_path, sync_type=SKSYNC_PROTO
     s.close()
 
 
-def run_client():
-    host, port = 'localhost', SKSYNC_DEFAULT_PORT
+def run_client(config):
+    host, port = config['host'], config['port']
+    if host == '0.0.0.0':
+        host = 'localhost'
+
     server_path, client_path = '/tmp/skmemos', '/tmp/skmemos_client'
     print host, port, server_path, client_path
     client_start_sync(host, port, server_path, client_path)
@@ -569,12 +605,28 @@ def run_client():
 def main(argv=None):
     if argv is None:
         argv = sys.argv
-    
+
     logger.setLevel(logging.INFO)
+    try:
+        conf_filename = argv[1]
+    except IndexError:
+        conf_filename = 'sksync.json'
+    logger.info('attempting to open config: %r', conf_filename)
+    try:
+        f = open(conf_filename, 'rb')
+        config = load_json(f.read())
+        f.close()
+    except IOError:
+        config = {}
+
+    # defaults
+    config['host'] = config.get('host', '0.0.0.0')
+    config['port'] = config.get('port', SKSYNC_DEFAULT_PORT)
+
     if 'client' in argv:
-        run_client()
+        run_client(config)
     else:
-        run_server()
+        run_server(config)
     
     return 0
 
