@@ -592,12 +592,13 @@ def client_start_sync(ip, port, server_path, client_path, sync_type=SKSYNC_PROTO
     s.close()
 
 
-def run_client(config):
+def run_client(config, config_name='client'):
     host, port = config['host'], config['port']
     if host == '0.0.0.0':
         host = 'localhost'
 
-    server_path, client_path = '/tmp/skmemos', '/tmp/skmemos_client'
+    client_config = config[config_name]
+    server_path, client_path = client_config['server_path'], client_config['client_path']
     print host, port, server_path, client_path
     client_start_sync(host, port, server_path, client_path)
 
@@ -606,6 +607,7 @@ def main(argv=None):
     if argv is None:
         argv = sys.argv
 
+    # TODO proper argument parsing
     logger.setLevel(logging.INFO)
     try:
         conf_filename = argv[1]

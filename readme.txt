@@ -13,5 +13,11 @@ Sample sksync.json contents:
 
     {
         "host": "0.0.0.0", 
-        "port": 23456
+        "port": 23456,
+        "client": {
+            "server_path": "/tmp/server/path",
+            "client_path": "/tmp/client/path"
+        }
     }
+
+"client" indicates the config for a sync client.
