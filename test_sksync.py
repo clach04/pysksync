@@ -96,6 +96,8 @@ class TestFileWalk(unittest.TestCase):
     def test_non_recursive_dir(self):
         file_list = sksync.get_file_listings(self.test_dir, recursive=False, include_size=True, return_list=True)
         canon = [('test3.txt', 1345316010000L, 1L), ('test1.txt', 1345316082000L, 1L), ('test2.txt', 1345316070000L, 1L)]
+        canon.sort()
+        file_list.sort()
         self.assertEqual(canon, file_list)
     
     def test_recursive_dir1(self):
@@ -107,6 +109,8 @@ class TestFileWalk(unittest.TestCase):
                 os.path.join('test2.txt'),
                 os.path.join('test3.txt'),
                 ]
+        canon.sort()
+        file_list.sort()
         self.assertEqual(canon, file_list)
     
     def test_recursive_dir2(self):
@@ -118,6 +122,8 @@ class TestFileWalk(unittest.TestCase):
                 ('test2.txt', 1345316070000L, 1L),
                 ('test3.txt', 1345316010000L, 1L),
                 ]
+        canon.sort()
+        file_list.sort()
         self.assertEqual(canon, file_list)
 
 
