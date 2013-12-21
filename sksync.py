@@ -79,6 +79,13 @@ SKSYNC_PROTOCOL_RECURSIVE = '0\n'
 SKSYNC_PROTOCOL_NON_RECURSIVE = '1\n'
 
 
+class BaseSkSyncException(Exception):
+    '''Base SK Sync exception'''
+
+class NotAllowed(BaseSkSyncException):
+    '''Requested operation not allowed exception'''
+
+
 logging.basicConfig()
 logger = logging
 logger = logging.getLogger("sksync")
@@ -288,6 +295,9 @@ class MyTCPHandler(SocketServer.BaseRequestHandler):
 
     def handle(self):
         logger.info('Client %r connected' % (self.request.getpeername(),))
+        config = getattr(self.server, 'sksync_config', {})
+        config['server_dir_whitelist'] = config.get('server_dir_whitelist', [])
+
         sync_timer = SimpleTimer()
         sync_timer.start()
         
@@ -321,6 +331,15 @@ class MyTCPHandler(SocketServer.BaseRequestHandler):
         server_path = server_path[:-1]  # loose trailing \n
         server_path = os.path.abspath(server_path)
         logger.debug('server_path abs: %r' % server_path)
+        if config['server_dir_whitelist']:
+            if server_path not in config['server_dir_whitelist']:
+                if config.get('server_dir_whitelist_policy', "deny") == 'silent':
+                    # silently ignore client's path request, use first white listed dir
+                    server_path = config['server_dir_whitelist'][0]
+                    logger.info('OVERRIDE server_path: %r', server_path)
+                else:
+                    logger.error('client requested path %r which is not in "server_dir_whitelist"', server_path)
+                    raise NotAllowed('access to path %r' % server_path)
 
         client_path = reader.next()
         logger.debug('client_path: %r' % client_path)
@@ -495,6 +514,7 @@ def run_server(config):
 
     # Create the server, binding to localhost on port 9999
     server = MyTCPServer((host, port), MyTCPHandler)
+    server.sksync_config = config
 
     # Activate the server; this will keep running until you
     # interrupt the program with Ctrl-C

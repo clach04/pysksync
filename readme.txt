@@ -21,3 +21,19 @@ Sample sksync.json contents:
     }
 
 "client" indicates the config for a sync client.
+
+Sample config that sets path that the server limits sync'ing to:
+
+    {
+        "host": "0.0.0.0", 
+        "port": 23456,
+        "server_dir_whitelist": ["/tmp/override/path"],
+        "server_dir_whitelist_policy": "silent",
+        "client": {
+            "server_path": "/tmp/server/path",
+            "client_path": "/tmp/client/path"
+        }
+    }
+
+If "server_dir_whitelist_policy" is not "silent" the server will terminate
+the client connection if "server_dir_whitelist" is set.
