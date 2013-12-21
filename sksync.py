@@ -257,7 +257,6 @@ def get_file_listings(path_of_files, recursive=False, include_size=False, return
 
     if not recursive:
         # TODO include file size param
-        # TODO recursive param
         # Get non-recursive list of files in real_client_path
         # FIXME TODO nasty hack using glob (i.e. not robust)
         file_list = glob.glob('*')
@@ -525,21 +524,26 @@ def client_start_sync(ip, port, server_path, client_path, sync_type=SKSYNC_PROTO
     """Implements SK Client, currently only supports:
        * direction =  "from server (use time)" ONLY
     """
+    logger.info('client connecting to server %s:%d', ip, port)
+    logger.info('server_path %r', server_path)
+    logger.info('client_path %r', client_path)
     real_client_path = os.path.abspath(client_path)
     file_list_str = ''
     
-    # TODO recursion
+    logger.info('determine client files')
     file_list = get_file_listings(real_client_path, recursive=recursive)
     file_list_info = []
     for filename, mtime in file_list:
         file_details = '%d %s' % (mtime, filename)
         file_list_info.append(file_details)
+    logger.info('Number of files on client %d', len(file_list_info))
     file_list_str = '\n'.join(file_list_info)
-    
+
     # Connect to the server
     s = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
     s.connect((ip, port))
-    
+    logger.info('connected')
+
     message = SKSYNC_PROTOCOL_01
     len_sent = s.send(message)
     logger.debug('sent: len %d %r' % (len_sent, message, ))
@@ -577,6 +581,7 @@ def client_start_sync(ip, port, server_path, client_path, sync_type=SKSYNC_PROTO
     # if get CR end of session, otherwise get files
     response = reader.next()
     logger.debug('Received: %r' % response)
+    received_file_count = 0
     while response != '\n':
         filename = response[:-1]  # loose trailing \n
         logger.debug('filename: %r' % filename)
@@ -603,13 +608,16 @@ def client_start_sync(ip, port, server_path, client_path, sync_type=SKSYNC_PROTO
         f.write(filecontents)
         f.close()
         os.utime(full_filename, (mtime, mtime))
-        
+        received_file_count += 1
+
         # any more files?
         response = reader.next()
         logger.debug('Received: %r' % response)
 
     # Clean up
     s.close()
+    logger.info('Number of files sent by server %d', received_file_count)
+    logger.info('disconnected')
 
 
 def run_client(config, config_name='client'):
@@ -619,7 +627,6 @@ def run_client(config, config_name='client'):
 
     client_config = config[config_name]
     server_path, client_path = client_config['server_path'], client_config['client_path']
-    print host, port, server_path, client_path
     client_start_sync(host, port, server_path, client_path)
 
 
