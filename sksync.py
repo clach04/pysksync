@@ -64,7 +64,22 @@ else:
     load_json = json.loads
 
 
-import srp
+def fake_module(name):
+    # Fail with a clear message (possibly at an unexpected time)
+    class MissingModule(object):
+        def __getattr__(self, attr):
+            raise ImportError('No module named %s' % name)
+
+        def __nonzero__(self):
+            return False
+
+    return MissingModule()
+
+try:
+    import srp
+except ImportError:
+    srp = fake_module('srp')
+
 
 
 # SK Sync specific constants
