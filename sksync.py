@@ -6,7 +6,10 @@
 import os
 import sys
 import socket
-import ssl
+try:
+    import ssl
+except ImportError:
+    ssl = None
 import SocketServer
 import threading
 import select
@@ -79,8 +82,8 @@ SKSYNC_PROTOCOL_TYPE_TO_SERVER_NO_TIME = '4\n'
 SKSYNC_PROTOCOL_RECURSIVE = '0\n'
 SKSYNC_PROTOCOL_NON_RECURSIVE = '1\n'
 
-
-SSL_VERSION = ssl.PROTOCOL_TLSv1
+if ssl:
+    SSL_VERSION = ssl.PROTOCOL_TLSv1
 
 
 class BaseSkSyncException(Exception):
