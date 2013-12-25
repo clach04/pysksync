@@ -59,12 +59,12 @@ above:
 
     {
         "use_ssl": true,
-        "ssl_certfile": "cert.pem",
-        "ssl_keyfile": "key.pem",
+        "ssl_server_certfile": "cert.pem",
+        "ssl_server_keyfile": "key.pem",
     }
 
-If the client config sets "ssl_certfile", the server certificate will be
-checked and the connection will be encrypted. If "ssl_certfile" is not set
+If the client config sets "ssl_server_certfile", the server certificate will be
+checked and the connection will be encrypted. If "ssl_server_certfile" is not set
 client side, the connection will be encrypted but the certificate will not
 be checked.
 
