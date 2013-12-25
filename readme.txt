@@ -71,3 +71,16 @@ be checked.
 The server needs both the certificate and key file. Note if the key file is
 protected by a pass phrase the server process will prompt on the console!
 For convenience, consider removing the pass phrase from the key file.
+
+Also the server can verify the client certificate too:
+
+    {
+        "use_ssl": true,
+        "ssl_server_certfile": "cert.pem",
+        "ssl_server_keyfile": "key.pem",
+        
+        "ssl_client_certfile": "cert.pem",
+        "ssl_client_keyfile": "key.pem",
+    }
+
+NOTE this example is using the same cert (and key) for both client and server.

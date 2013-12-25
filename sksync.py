@@ -316,7 +316,16 @@ class MyTCPHandler(SocketServer.BaseRequestHandler):
                 logger.info('using SSL certificate file  %r' % ssl_server_certfile)
                 logger.info('using SSL key file  %r' % ssl_server_keyfile)
 
-                self.request = ssl.wrap_socket(self.request,
+                if config.get('ssl_client_certfile'):
+                    self.request = ssl.wrap_socket(self.request,
+                                    server_side=True,
+                                    certfile=ssl_server_certfile,
+                                    keyfile=ssl_server_keyfile,
+                                    ca_certs=config['ssl_client_certfile'],  # verify client
+                                    cert_reqs=ssl.CERT_REQUIRED,
+                                    ssl_version=SSL_VERSION)
+                else:
+                    self.request = ssl.wrap_socket(self.request,
                                     server_side=True,
                                     certfile=ssl_server_certfile,
                                     keyfile=ssl_server_keyfile,
@@ -544,7 +553,7 @@ def run_server(config):
     server.serve_forever()
 
 
-def client_start_sync(ip, port, server_path, client_path, sync_type=SKSYNC_PROTOCOL_TYPE_FROM_SERVER_USE_TIME, recursive=False, use_ssl=None, ssl_server_certfile=None):
+def client_start_sync(ip, port, server_path, client_path, sync_type=SKSYNC_PROTOCOL_TYPE_FROM_SERVER_USE_TIME, recursive=False, use_ssl=None, ssl_server_certfile=None, ssl_client_certfile=None, ssl_client_keyfile=None):
     """Implements SK Client, currently only supports:
        * direction =  "from server (use time)" ONLY
     """
@@ -571,7 +580,16 @@ def client_start_sync(ip, port, server_path, client_path, sync_type=SKSYNC_PROTO
             logger.info('Attempting SSL session')
             if ssl_server_certfile:
                 logger.info('using SSL certificate file  %r' % ssl_server_certfile)
-                s = ssl.wrap_socket(s,
+                if ssl_client_certfile:
+                    s = ssl.wrap_socket(s,
+                               ca_certs=ssl_server_certfile,
+                               cert_reqs=ssl.CERT_REQUIRED,
+                               certfile=ssl_client_certfile,
+                               keyfile=ssl_client_keyfile,
+                               ssl_version=SSL_VERSION)
+                else:
+                    # assume that if server is checking client cert, client will be checking server cert
+                    s = ssl.wrap_socket(s,
                                ca_certs=ssl_server_certfile,
                                cert_reqs=ssl.CERT_REQUIRED,
                                ssl_version=SSL_VERSION)
@@ -673,7 +691,10 @@ def run_client(config, config_name='client'):
     server_path, client_path = client_config['server_path'], client_config['client_path']
     use_ssl = config.get('use_ssl')
     ssl_server_certfile = config.get('ssl_server_certfile')
-    client_start_sync(host, port, server_path, client_path, use_ssl=use_ssl, ssl_server_certfile=ssl_server_certfile)
+    
+    ssl_client_certfile = config.get('ssl_client_certfile')
+    ssl_client_keyfile = config.get('ssl_client_keyfile')
+    client_start_sync(host, port, server_path, client_path, use_ssl=use_ssl, ssl_server_certfile=ssl_server_certfile, ssl_client_certfile=ssl_client_certfile, ssl_client_keyfile=ssl_client_keyfile)
 
 
 def main(argv=None):
