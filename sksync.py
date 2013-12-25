@@ -330,6 +330,7 @@ class MyTCPHandler(SocketServer.BaseRequestHandler):
                                     certfile=ssl_server_certfile,
                                     keyfile=ssl_server_keyfile,
                                     ssl_version=SSL_VERSION)
+                logger.info('SSL connected using %r', self.request.cipher())
             except ssl.SSLError, info:
                 logger.error('Error starting SSL, check certificate and key are valid. %r' % info)
                 # could be a bad client....
@@ -599,6 +600,7 @@ def client_start_sync(ip, port, server_path, client_path, sync_type=SKSYNC_PROTO
                                cert_reqs=ssl.CERT_NONE,
                                ssl_version=SSL_VERSION)
             s.connect((ip, port))
+            logger.info('SSL connected using %r', s.cipher())
         except ssl.SSLError, info:
             logger.error('Error starting SSL connection, check SSL is enabled on server and certificate and key are valid. %r' % info)
             return
