@@ -63,6 +63,8 @@ else:
     load_json = json.loads
 
 
+FILENAME_ENCODING = 'UTF-8'
+
 SKSYNC_DEFAULT_PORT = 23456
 #SKSYNC_DEFAULT_PORT = 23456 + 1  # FIXME DEBUG not default!!
 #SKSYNC_DEFAULT_PORT = 23456 + 3  # FIXME DEBUG not default!!
@@ -351,6 +353,7 @@ class MyTCPHandler(SocketServer.BaseRequestHandler):
             # TODO start counting and other stats
             # read all file details
             filename, mtime = parse_file_details(response)
+            filename = filename.decode(FILENAME_ENCODING)
             if os.path.sep == '\\':
                 # Windows
                 filename = filename.replace('/', '\\')  # Unix path conversion to Windows
@@ -412,7 +415,11 @@ class MyTCPHandler(SocketServer.BaseRequestHandler):
                     send_filename = filename.replace('\\', '/')
                 else:
                     send_filename = filename
-                file_details = '%s\n%d\n%d\n' % (send_filename, mtime, data_len)  # FIXME non-asci filenames
+                if isinstance(send_filename, unicode):
+                    # Need to send binary/byte across wire
+                    send_filename = send_filename.encode(FILENAME_ENCODING)
+
+                file_details = '%s\n%d\n%d\n' % (send_filename, mtime, data_len)
                 logger.debug('file_details: %r', file_details)
                 f = open(filename, 'rb')
                 data = f.read()
@@ -534,6 +541,9 @@ def client_start_sync(ip, port, server_path, client_path, sync_type=SKSYNC_PROTO
     file_list = get_file_listings(real_client_path, recursive=recursive)
     file_list_info = []
     for filename, mtime in file_list:
+        if isinstance(filename, unicode):
+            # Need to send binary/byte across wire
+            filename = filename.encode(FILENAME_ENCODING)
         file_details = '%d %s' % (mtime, filename)
         file_list_info.append(file_details)
     logger.info('Number of files on client %d', len(file_list_info))
@@ -565,6 +575,13 @@ def client_start_sync(ip, port, server_path, client_path, sync_type=SKSYNC_PROTO
     
     # type of sync? and folders to sync (server path, client path)
     # example: '0\n/tmp/skmemos\n/sdcard/skmemos\n\n'
+    if isinstance(server_path, unicode):
+        # Need to send binary/byte across wire
+        server_path = server_path.encode(FILENAME_ENCODING)
+    if isinstance(client_path, unicode):
+        # Need to send binary/byte across wire
+        client_path = client_path.encode(FILENAME_ENCODING)
+
     if file_list_str:
         # FIXME this could be refactored....
         message = recursive_type + server_path + '\n' + client_path + '\n' + file_list_str + '\n\n'
@@ -585,6 +602,7 @@ def client_start_sync(ip, port, server_path, client_path, sync_type=SKSYNC_PROTO
     while response != '\n':
         filename = response[:-1]  # loose trailing \n
         logger.debug('filename: %r' % filename)
+        filename = filename.decode(FILENAME_ENCODING)
         mtime = reader.next()
         logger.debug('mtime: %r' % mtime)
         mtime = norm_mtime(mtime)
@@ -627,7 +645,8 @@ def run_client(config, config_name='client'):
 
     client_config = config[config_name]
     server_path, client_path = client_config['server_path'], client_config['client_path']
-    client_start_sync(host, port, server_path, client_path)
+    recursive = client_config.get('recursive')
+    client_start_sync(host, port, server_path, client_path, recursive=recursive)
 
 
 def main(argv=None):
