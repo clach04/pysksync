@@ -84,3 +84,9 @@ Also the server can verify the client certificate too:
     }
 
 NOTE this example is using the same cert (and key) for both client and server.
+
+There is a small overhead with the SSL support (unclear if compression is on
+or off with CPython 2.x ssl lib). Performing a loopback test on the same
+machine with 1502 files ~7.7Mb takes 0.66 secs without SSL and 0.93 secs with
+TLSv1/SSLv3 and AES256-SHA encryption.
+
