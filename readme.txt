@@ -12,8 +12,7 @@ Change server settings, provide a file called `sksync.json`
 Sample sksync.json contents:
 
     {
-        "host": "0.0.0.0", 
-        "port": 23456,
+        "sksync1_compat": true,
         "client": {
             "recursive": false,
             "server_path": "/tmp/server/path",
@@ -21,11 +20,13 @@ Sample sksync.json contents:
         }
     }
 
-"client" indicates the config for a sync client.
+"client" indicates the config for a sync client. I.e. this file
+can be used for both client and server.
 
-Sample config that sets path that the server limits sync'ing to:
+Sample config that limits the paths that clients can sync with:
 
     {
+        "sksync1_compat": true,
         "host": "0.0.0.0", 
         "port": 23456,
         "server_dir_whitelist": ["/tmp/override/path"],
@@ -38,7 +39,15 @@ Sample config that sets path that the server limits sync'ing to:
     }
 
 If "server_dir_whitelist_policy" is not "silent" the server will terminate
-the client connection if "server_dir_whitelist" is set.
+the client connection if "server_dir_whitelist" is set. This means that the
+server will not share all disks and directories.
+
+
+sksync1_compat
+
+sksync1_compat limits the filename encoding to a Latin1 encoding (cp1252).
+If sksync1_compat is not set UTF-8 is used instead, for full character
+preservation support.
 
 
 Enabling SSL support
