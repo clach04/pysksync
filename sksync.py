@@ -607,6 +607,10 @@ def client_start_sync(ip, port, server_path, client_path, sync_type=SKSYNC_PROTO
     real_client_path = os.path.abspath(client_path)
     file_list_str = ''
 
+    if sksync1_compat and use_ssl:
+        logger.error('Compatibility with SK Sync 1 and SSL support are incompatible options.')
+        raise NotAllowed('SK sync v1 support and SSL support at the same time.')
+
     if sksync1_compat:
         filename_encoding = FILENAME_ENCODING
         sync_protocol = SKSYNC_PROTOCOL_01
