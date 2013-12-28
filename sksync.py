@@ -6,6 +6,10 @@
 import os
 import sys
 import socket
+try:
+    import ssl
+except ImportError:
+    ssl = None
 import SocketServer
 import threading
 import select
@@ -83,6 +87,9 @@ SKSYNC_PROTOCOL_TYPE_TO_SERVER_NO_TIME = '4\n'
 
 SKSYNC_PROTOCOL_RECURSIVE = '0\n'
 SKSYNC_PROTOCOL_NON_RECURSIVE = '1\n'
+
+if ssl:
+    SSL_VERSION = ssl.PROTOCOL_TLSv1
 
 
 class BaseSkSyncException(Exception):
@@ -315,8 +322,35 @@ class MyTCPHandler(SocketServer.BaseRequestHandler):
 
         sync_timer = SimpleTimer()
         sync_timer.start()
-        
+
         # self.request is the TCP socket connected to the client
+        if config.get('use_ssl'):
+            try:
+                logger.info('Attempting SSL session')
+                ssl_server_certfile = config.get('ssl_server_certfile')
+                ssl_server_keyfile = config.get('ssl_server_keyfile')
+                logger.info('using SSL certificate file  %r' % ssl_server_certfile)
+                logger.info('using SSL key file  %r' % ssl_server_keyfile)
+
+                if config.get('ssl_client_certfile'):
+                    self.request = ssl.wrap_socket(self.request,
+                                    server_side=True,
+                                    certfile=ssl_server_certfile,
+                                    keyfile=ssl_server_keyfile,
+                                    ca_certs=config['ssl_client_certfile'],  # verify client
+                                    cert_reqs=ssl.CERT_REQUIRED,
+                                    ssl_version=SSL_VERSION)
+                else:
+                    self.request = ssl.wrap_socket(self.request,
+                                    server_side=True,
+                                    certfile=ssl_server_certfile,
+                                    keyfile=ssl_server_keyfile,
+                                    ssl_version=SSL_VERSION)
+                logger.info('SSL connected using %r', self.request.cipher())
+            except ssl.SSLError, info:
+                logger.error('Error starting SSL, check certificate and key are valid. %r' % info)
+                # could be a bad client....
+                return
         reader = SKBufferedSocket(self.request)
         response = reader.next()
         logger.debug('Received: %r' % response)
@@ -556,7 +590,7 @@ def run_server(config):
     server.serve_forever()
 
 
-def client_start_sync(ip, port, server_path, client_path, sync_type=SKSYNC_PROTOCOL_TYPE_FROM_SERVER_USE_TIME, recursive=False):
+def client_start_sync(ip, port, server_path, client_path, sync_type=SKSYNC_PROTOCOL_TYPE_FROM_SERVER_USE_TIME, recursive=False, use_ssl=None, ssl_server_certfile=None, ssl_client_certfile=None, ssl_client_keyfile=None):
     """Implements SK Client, currently only supports:
        * direction =  "from server (use time)" ONLY
     """
@@ -593,7 +627,37 @@ def client_start_sync(ip, port, server_path, client_path, sync_type=SKSYNC_PROTO
 
     # Connect to the server
     s = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
-    s.connect((ip, port))
+
+    if use_ssl:
+        try:
+            logger.info('Attempting SSL session')
+            if ssl_server_certfile:
+                logger.info('using SSL certificate file  %r' % ssl_server_certfile)
+                if ssl_client_certfile:
+                    s = ssl.wrap_socket(s,
+                               ca_certs=ssl_server_certfile,
+                               cert_reqs=ssl.CERT_REQUIRED,
+                               certfile=ssl_client_certfile,
+                               keyfile=ssl_client_keyfile,
+                               ssl_version=SSL_VERSION)
+                else:
+                    # assume that if server is checking client cert, client will be checking server cert
+                    s = ssl.wrap_socket(s,
+                               ca_certs=ssl_server_certfile,
+                               cert_reqs=ssl.CERT_REQUIRED,
+                               ssl_version=SSL_VERSION)
+            else:
+                logger.info('ignoring SSL certificate')
+                s = ssl.wrap_socket(s,
+                               cert_reqs=ssl.CERT_NONE,
+                               ssl_version=SSL_VERSION)
+            s.connect((ip, port))
+            logger.info('SSL connected using %r', s.cipher())
+        except ssl.SSLError, info:
+            logger.error('Error starting SSL connection, check SSL is enabled on server and certificate and key are valid. %r' % info)
+            return
+    else:
+        s.connect((ip, port))
     logger.info('connected')
 
     message = SKSYNC_PROTOCOL_01
@@ -688,7 +752,13 @@ def run_client(config, config_name='client'):
     client_config = config[config_name]
     server_path, client_path = client_config['server_path'], client_config['client_path']
     recursive = client_config.get('recursive')
-    client_start_sync(host, port, server_path, client_path, recursive=recursive)
+
+    use_ssl = config.get('use_ssl')
+    ssl_server_certfile = config.get('ssl_server_certfile')
+
+    ssl_client_certfile = config.get('ssl_client_certfile')
+    ssl_client_keyfile = config.get('ssl_client_keyfile')
+    client_start_sync(host, port, server_path, client_path, recursive=recursive, use_ssl=use_ssl, ssl_server_certfile=ssl_server_certfile, ssl_client_certfile=ssl_client_certfile, ssl_client_keyfile=ssl_client_keyfile)
 
 
 def main(argv=None):
