@@ -421,37 +421,48 @@ class MyTCPHandler(SocketServer.BaseRequestHandler):
         current_dir = os.getcwd()  # TODO non-ascii; os.getcwdu()
         os.chdir(server_path)
         sent_count = 0
+        skip_count = 0
         try:
             for filename in missing_from_client:
-                logger.debug('File to send: %r', filename)
-                mtime, data_len = server_files[filename]
-                if os.path.sep == '\\':
-                    # Windows path conversion to Unix/protocol
-                    send_filename = filename.replace('\\', '/')
-                else:
-                    send_filename = filename
-                if isinstance(send_filename, str):
-                    # Assume str, in locale encoding
-                    send_filename = send_filename.decode(SYSTEM_ENCODING)
-                if isinstance(send_filename, unicode):
-                    # Need to send binary/byte across wire
-                    send_filename = send_filename.encode(FILENAME_ENCODING)
+                try:
+                    logger.debug('File to send: %r', filename)
+                    mtime, data_len = server_files[filename]
+                    if os.path.sep == '\\':
+                        # Windows path conversion to Unix/protocol
+                        send_filename = filename.replace('\\', '/')
+                    else:
+                        send_filename = filename
+                    if isinstance(send_filename, str):
+                        # Assume str, in locale encoding
+                        send_filename = send_filename.decode(SYSTEM_ENCODING)
+                    if isinstance(send_filename, unicode):
+                        # Need to send binary/byte across wire
+                        send_filename = send_filename.encode(FILENAME_ENCODING)
 
-                file_details = '%s\n%d\n%d\n' % (send_filename, mtime, data_len)
-                logger.debug('file_details: %r', file_details)
-                f = open(filename, 'rb')
-                data = f.read()
-                f.close()
-                self.request.send(file_details)
-                self.request.send(data)
-                sent_count += 1
+                    file_details = '%s\n%d\n%d\n' % (send_filename, mtime, data_len)
+                    logger.debug('file_details: %r', file_details)
+                    f = open(filename, 'rb')
+                    data = f.read()
+                    f.close()
+                    self.request.send(file_details)
+                    self.request.send(data)
+                    sent_count += 1
+                except UnicodeEncodeError:
+                    # Skip this file
+                    logger.error('Encoding error - unable to access and process %r, ignoring"', filename)
+                    skip_count += 1
+                    continue
 
             # Tell client there are no files to send back
             self.request.sendall('\n')
         finally:
             os.chdir(current_dir)
         sync_timer.stop()
-        logger.info('Successfully checked %r, set sent %r files in %s', len(server_files), sent_count, sync_timer)
+        if skip_count:
+            skip_count_str = ', skipped %d' % skip_count
+        else:
+            skip_count_str = ''
+        logger.info('Successfully checked %r, set sent %r%s files in %s', len(server_files), sent_count, skip_count_str, sync_timer)
         logger.info('Client %r disconnected' % (self.request.getpeername(),))
 
 
@@ -559,15 +570,25 @@ def client_start_sync(ip, port, server_path, client_path, sync_type=SKSYNC_PROTO
     file_list = get_file_listings(real_client_path, recursive=recursive)
     file_list_info = []
     for filename, mtime in file_list:
-        if isinstance(filename, str):
-            # Assume str, in locale encoding
-            filename = filename.decode(SYSTEM_ENCODING)
-        if isinstance(filename, unicode):
-            # Need to send binary/byte across wire
-            filename = filename.encode(FILENAME_ENCODING)
-        file_details = '%d %s' % (mtime, filename)
-        file_list_info.append(file_details)
-    logger.info('Number of files on client %d', len(file_list_info))
+        try:
+            if isinstance(filename, str):
+                # Assume str, in locale encoding
+                filename = filename.decode(SYSTEM_ENCODING)
+            if isinstance(filename, unicode):
+                # Need to send binary/byte across wire
+                filename = filename.encode(FILENAME_ENCODING)
+            file_details = '%d %s' % (mtime, filename)
+            file_list_info.append(file_details)
+        except UnicodeEncodeError:
+            # Skip this file
+            logger.error('Encoding error - unable to access and process %r, ignoring"', filename)
+            # TODO log summary of skipped files at end
+            continue
+    logger.info('Number of files on client %d', len(file_list))
+    logger.info('Number of files to process on client %d', len(file_list_info))
+    delta = len(file_list) - len(file_list_info)
+    if delta != 0:
+        logger.info('Skiping %d', delta)
     file_list_str = '\n'.join(file_list_info)
 
     # Connect to the server
