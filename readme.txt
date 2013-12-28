@@ -15,6 +15,7 @@ Sample sksync.json contents:
         "host": "0.0.0.0", 
         "port": 23456,
         "client": {
+            "recursive": false,
             "server_path": "/tmp/server/path",
             "client_path": "/tmp/client/path"
         }
@@ -30,6 +31,7 @@ Sample config that sets path that the server limits sync'ing to:
         "server_dir_whitelist": ["/tmp/override/path"],
         "server_dir_whitelist_policy": "silent",
         "client": {
+            "recursive": true,
             "server_path": "/tmp/server/path",
             "client_path": "/tmp/client/path"
         }
