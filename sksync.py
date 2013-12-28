@@ -302,7 +302,7 @@ def get_file_listings(path_of_files, recursive=False, include_size=False, return
             # Probably Windows, with a (byte/str) filename containing
             # characters that are NOT in the current locale we can't
             # access it unless we have a Unicode filename
-            logger.error('Unable to access and process %r, ignoring"', filename)
+            logger.error('Unable to access and process %r, ignoring', filename)
     os.chdir(current_dir)
     return listings_result
 
@@ -496,7 +496,7 @@ class MyTCPHandler(SocketServer.BaseRequestHandler):
                     sent_count += 1
                 except UnicodeEncodeError:
                     # Skip this file
-                    logger.error('Encoding error - unable to access and process %r, ignoring"', filename)
+                    logger.error('Encoding error - unable to access and process %r, ignoring', filename)
                     skip_count += 1
                     continue
 
@@ -644,7 +644,7 @@ def client_start_sync(ip, port, server_path, client_path, sync_type=SKSYNC_PROTO
             file_list_info.append(file_details)
         except UnicodeEncodeError:
             # Skip this file
-            logger.error('Encoding error - unable to access and process %r, ignoring"', filename)
+            logger.error('Encoding error - unable to access and process %r, ignoring', filename)
             # TODO log summary of skipped files at end
             continue
     logger.info('Number of files on client %d', len(file_list))
