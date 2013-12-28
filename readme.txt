@@ -5,16 +5,14 @@ Start server with default settings:
 
     python sksync.py
 
-This server is compatible with SK Sync Android client when "require_auth"
-is set to false (the default for "require_auth" is true)
+This server is compatible with SK Sync Android client.
 
 Change server settings, provide a file called `sksync.json`
 
 Sample sksync.json contents:
 
     {
-        "host": "0.0.0.0", 
-        "port": 23456,
+        "sksync1_compat": true,
         "client": {
             "recursive": false,
             "server_path": "/tmp/server/path",
@@ -22,12 +20,13 @@ Sample sksync.json contents:
         }
     }
 
-"client" indicates the config for a sync client.
+"client" indicates the config for a sync client. I.e. this file
+can be used for both client and server.
 
-Sample config suitable for use with existing Android SK Sync client that
-restricts paths the server will sync with:
+Sample config that limits the paths that clients can sync with:
 
     {
+        "sksync1_compat": true,
         "host": "0.0.0.0", 
         "port": 23456,
         "server_dir_whitelist": ["/tmp/override/path"],
@@ -43,7 +42,15 @@ restricts paths the server will sync with:
 NOTE the require_auth entry for backwards compatibility with SK Sync.
 
 If "server_dir_whitelist_policy" is not "silent" the server will terminate
-the client connection if "server_dir_whitelist" is set.
+the client connection if "server_dir_whitelist" is set. This means that the
+server will not share all disks and directories.
+
+
+sksync1_compat
+
+sksync1_compat limits the filename encoding to a Latin1 encoding (cp1252).
+If sksync1_compat is not set UTF-8 is used instead, for full character
+preservation support.
 
 
 Enabling SSL support

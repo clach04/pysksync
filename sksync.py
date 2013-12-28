@@ -329,7 +329,7 @@ def get_file_listings(path_of_files, recursive=False, include_size=False, return
             # Probably Windows, with a (byte/str) filename containing
             # characters that are NOT in the current locale we can't
             # access it unless we have a Unicode filename
-            logger.error('Unable to access and process %r, ignoring"', filename)
+            logger.error('Unable to access and process %r, ignoring', filename)
     os.chdir(current_dir)
     return listings_result
 
@@ -475,11 +475,17 @@ class MyTCPHandler(SocketServer.BaseRequestHandler):
         server_path = server_path[:-1]  # loose trailing \n
         server_path = os.path.abspath(server_path)
         logger.debug('server_path abs: %r' % server_path)
+        server_dir_whitelist = []
         if config['server_dir_whitelist']:
-            if server_path not in config['server_dir_whitelist']:
+            server_dir_whitelist = []
+            for tmp_path in config['server_dir_whitelist']:
+                # clean path so we can use string comparisons for dir equality check
+                tmp_path = os.path.abspath(tmp_path)
+                server_dir_whitelist.append(tmp_path)
+            if server_path not in server_dir_whitelist:
                 if config.get('server_dir_whitelist_policy', "deny") == 'silent':
                     # silently ignore client's path request, use first white listed dir
-                    server_path = config['server_dir_whitelist'][0]
+                    server_path = server_dir_whitelist[0]
                     logger.info('OVERRIDE server_path: %r', server_path)
                 else:
                     logger.error('client requested path %r which is not in "server_dir_whitelist"', server_path)
@@ -511,6 +517,8 @@ class MyTCPHandler(SocketServer.BaseRequestHandler):
         # TODO start counting and other stats
         # TODO output count and other stats
         logger.info('Number of files on client %r ' % (len(client_files),))
+        # NOTE if sync type is SKSYNC_PROTOCOL_TYPE_FROM_SERVER_* and
+        # server_path does not exist, SK Sync simply returns 0 files
         server_files = get_file_listings(server_path, recursive=recursive, include_size=True, return_list=False, force_unicode=True)
         logger.info('Number of files on server %r ' % (len(server_files),))
         
@@ -578,7 +586,7 @@ class MyTCPHandler(SocketServer.BaseRequestHandler):
                     sent_count += 1
                 except UnicodeEncodeError:
                     # Skip this file
-                    logger.error('Encoding error - unable to access and process %r, ignoring"', filename)
+                    logger.error('Encoding error - unable to access and process %r, ignoring', filename)
                     skip_count += 1
                     continue
 
@@ -693,7 +701,6 @@ def client_start_sync(ip, port, server_path, client_path, sync_type=SKSYNC_PROTO
     """Implements SK Client, currently only supports:
        * direction =  "from server (use time)" ONLY
     """
-    logger.info('client connecting to server %s:%d', ip, port)
     logger.info('server_path %r', server_path)
     logger.info('client_path %r', client_path)
     real_client_path = os.path.abspath(client_path)
@@ -706,6 +713,9 @@ def client_start_sync(ip, port, server_path, client_path, sync_type=SKSYNC_PROTO
         logger.error('Compatibility with SK Sync 1 and SSL/SRP are incompatible options.')
         raise NotAllowed('SK sync v1 support and SSL/SRP at the same time.')
 
+    sync_timer = SimpleTimer()
+    sync_timer.start()
+
     if sksync1_compat:
         filename_encoding = FILENAME_ENCODING
         sync_protocol = SKSYNC_PROTOCOL_01
@@ -714,7 +724,7 @@ def client_start_sync(ip, port, server_path, client_path, sync_type=SKSYNC_PROTO
         sync_protocol = PYSKSYNC_PROTOCOL_01
 
     logger.info('filename_encoding %r', filename_encoding)
-    logger.info('determine client files')
+    logger.info('determining client files')
     file_list = get_file_listings(real_client_path, recursive=recursive)
     file_list_info = []
     for filename, mtime in file_list:
@@ -729,7 +739,7 @@ def client_start_sync(ip, port, server_path, client_path, sync_type=SKSYNC_PROTO
             file_list_info.append(file_details)
         except UnicodeEncodeError:
             # Skip this file
-            logger.error('Encoding error - unable to access and process %r, ignoring"', filename)
+            logger.error('Encoding error - unable to access and process %r, ignoring', filename)
             # TODO log summary of skipped files at end
             continue
     logger.info('Number of files on client %d', len(file_list))
@@ -740,6 +750,7 @@ def client_start_sync(ip, port, server_path, client_path, sync_type=SKSYNC_PROTO
     file_list_str = '\n'.join(file_list_info)
 
     # Connect to the server
+    logger.info('client connecting to server %s:%d', ip, port)
     s = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
 
     if use_ssl:
@@ -922,7 +933,7 @@ def client_start_sync(ip, port, server_path, client_path, sync_type=SKSYNC_PROTO
         logger.debug('filesize: %r' % filesize)
         filesize = int(filesize)
         logger.debug('filesize: %r' % filesize)
-        logger.info('processing %r' % ((filename, filesize, mtime),))
+        logger.info('processing %r' % ((filename, filesize, mtime),))  # TODO add option to supress this?
         
         # now read filesize bytes....
         filecontents = reader.recv(filesize)
@@ -944,7 +955,10 @@ def client_start_sync(ip, port, server_path, client_path, sync_type=SKSYNC_PROTO
 
     # Clean up
     s.close()
-    logger.info('Number of files sent by server %d', received_file_count)
+    sync_timer.stop()
+    logger.info('Number of files sent by server %d in %s', received_file_count, sync_timer)
+    if delta != 0:
+        logger.info('Skipped %d', delta)
     logger.info('disconnected')
 
 
