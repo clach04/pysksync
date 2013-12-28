@@ -592,6 +592,7 @@ def run_server(config):
          (this is not a normal SK Sync option)
     """
 
+    config = set_default_config(config)
     if config.get('sksync1_compat') and config.get('use_ssl'):
         logger.error('Compatibility with SK Sync 1 and SSL support are incompatible options.')
         raise NotAllowed('SK sync v1 support and SSL support at the same time.')
@@ -782,6 +783,7 @@ def client_start_sync(ip, port, server_path, client_path, sync_type=SKSYNC_PROTO
 
 
 def run_client(config, config_name='client'):
+    config = set_default_config(config)
     host, port = config['host'], config['port']
     if host == '0.0.0.0':
         host = 'localhost'
@@ -803,6 +805,8 @@ def set_default_config(config):
     # defaults
     config['host'] = config.get('host', '0.0.0.0')
     config['port'] = config.get('port', SKSYNC_DEFAULT_PORT)
+    config['sksync1_compat'] = config.get('sksync1_compat', False)
+    config['use_ssl'] = config.get('use_ssl', False)
     return config
 
 
