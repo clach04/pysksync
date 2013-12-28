@@ -429,6 +429,8 @@ class MyTCPHandler(SocketServer.BaseRequestHandler):
         # TODO start counting and other stats
         # TODO output count and other stats
         logger.info('Number of files on client %r ' % (len(client_files),))
+        # NOTE if sync type is SKSYNC_PROTOCOL_TYPE_FROM_SERVER_* and
+        # server_path does not exist, SK Sync simply returns 0 files
         server_files = get_file_listings(server_path, recursive=recursive, include_size=True, return_list=False, force_unicode=True)
         logger.info('Number of files on server %r ' % (len(server_files),))
         
