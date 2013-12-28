@@ -7,6 +7,7 @@ import sys
 import string
 import errno
 import shutil
+import socket
 import threading
 import unittest
 
@@ -31,6 +32,15 @@ def safe_rmtree(testdir):
             pass
         else:
             raise
+
+
+def get_random_port():
+    """Determine a port number suitable for listening on"""
+    x = socket.socket()
+    x.bind(('', 0))
+    hostname, host_port = x.getsockname()
+    x.close()
+    return host_port
 
 
 def check_file_contents_and_mtime(pathname, filename):
@@ -64,7 +74,7 @@ def create_test_files(testdir='tmp_testsuitedir', data_override=None):
         os.utime(filename, (mtime, mtime))
 
 
-def perform_sync(server_dir, client_dir, HOST='127.0.0.1', PORT=sksync.SKSYNC_DEFAULT_PORT, recursive=False):
+def perform_sync(server_dir, client_dir, HOST='127.0.0.1', PORT=get_random_port(), recursive=False):
     
     # Start sync server in thread
     server = sksync.MyThreadedTCPServer((HOST, PORT), sksync.MyTCPHandler)
