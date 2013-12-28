@@ -12,6 +12,7 @@ import select
 import logging
 import glob
 import errno
+import locale
 
 try:
     #raise ImportError ## Debug, pretend we are 2.3 and earlier
@@ -64,6 +65,9 @@ else:
 
 
 FILENAME_ENCODING = 'UTF-8'
+FILENAME_ENCODING = 'cp1252'  # latin1 encoding used by sksync 1
+language_name, SYSTEM_ENCODING = locale.getdefaultlocale()
+#print language_name, SYSTEM_ENCODING
 
 SKSYNC_DEFAULT_PORT = 23456
 #SKSYNC_DEFAULT_PORT = 23456 + 1  # FIXME DEBUG not default!!
@@ -248,7 +252,7 @@ def path_walker(path_to_search, filename_filter=None, abspath=False):
 
 ###############################################################
 
-def get_file_listings(path_of_files, recursive=False, include_size=False, return_list=True):
+def get_file_listings(path_of_files, recursive=False, include_size=False, return_list=True, force_unicode=False):
     """return_list=True, if False returns dict
     """
     
@@ -273,6 +277,11 @@ def get_file_listings(path_of_files, recursive=False, include_size=False, return
             mtime = x.st_mtime
             # TODO non-ascii path names
             mtime = int(mtime) * 1000  # TODO norm
+            if force_unicode:
+                if isinstance(filename, str):
+                    # This is probably Windows
+                    # Assume str, in locale encoding
+                    filename = filename.decode(SYSTEM_ENCODING)
             if include_size:
                 file_details = (filename, mtime, x.st_size)
             else:
@@ -281,6 +290,11 @@ def get_file_listings(path_of_files, recursive=False, include_size=False, return
                 listings_result.append(file_details)
             else:
                 listings_result[filename] = file_details[1:]
+        else:
+            # Probably Windows, with a (byte/str) filename containing
+            # characters that are NOT in the current locale we can't
+            # access it unless we have a Unicode filename
+            logger.error('Unable to access and process %r, ignoring"', filename)
     os.chdir(current_dir)
     return listings_result
 
@@ -353,6 +367,7 @@ class MyTCPHandler(SocketServer.BaseRequestHandler):
             # TODO start counting and other stats
             # read all file details
             filename, mtime = parse_file_details(response)
+            logger.debug('Received meta data for: %r' % ((filename, mtime),))
             filename = filename.decode(FILENAME_ENCODING)
             if os.path.sep == '\\':
                 # Windows
@@ -367,7 +382,7 @@ class MyTCPHandler(SocketServer.BaseRequestHandler):
         # TODO start counting and other stats
         # TODO output count and other stats
         logger.info('Number of files on client %r ' % (len(client_files),))
-        server_files = get_file_listings(server_path, recursive=recursive, include_size=True, return_list=False)
+        server_files = get_file_listings(server_path, recursive=recursive, include_size=True, return_list=False, force_unicode=True)
         logger.info('Number of files on server %r ' % (len(server_files),))
         
         server_files_set = set(server_files)
@@ -415,6 +430,9 @@ class MyTCPHandler(SocketServer.BaseRequestHandler):
                     send_filename = filename.replace('\\', '/')
                 else:
                     send_filename = filename
+                if isinstance(send_filename, str):
+                    # Assume str, in locale encoding
+                    send_filename = send_filename.decode(SYSTEM_ENCODING)
                 if isinstance(send_filename, unicode):
                     # Need to send binary/byte across wire
                     send_filename = send_filename.encode(FILENAME_ENCODING)
@@ -541,6 +559,9 @@ def client_start_sync(ip, port, server_path, client_path, sync_type=SKSYNC_PROTO
     file_list = get_file_listings(real_client_path, recursive=recursive)
     file_list_info = []
     for filename, mtime in file_list:
+        if isinstance(filename, str):
+            # Assume str, in locale encoding
+            filename = filename.decode(SYSTEM_ENCODING)
         if isinstance(filename, unicode):
             # Need to send binary/byte across wire
             filename = filename.encode(FILENAME_ENCODING)
