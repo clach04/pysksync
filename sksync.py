@@ -672,9 +672,9 @@ def run_server(config):
          (this is not a normal SK Sync option)
     """
 
-    if config.get('sksync1_compat') and config.get('use_ssl'):
-        logger.error('Compatibility with SK Sync 1 and SSL support are incompatible options.')
-        raise NotAllowed('SK sync v1 support and SSL support at the same time.')
+    if config.get('sksync1_compat') and (config.get('use_ssl') or config.get('require_auth', True)):
+        logger.error('Compatibility with SK Sync 1 and use_ssl/require_auth are incompatible options.')
+        raise NotAllowed('SK sync v1 support and use_ssl/require_auth at the same time.')
 
     host, port = config['host'], config['port']
 
@@ -702,9 +702,9 @@ def client_start_sync(ip, port, server_path, client_path, sync_type=SKSYNC_PROTO
     username = username or ''
     password = password or ''
 
-    if sksync1_compat and use_ssl:
-        logger.error('Compatibility with SK Sync 1 and SSL support are incompatible options.')
-        raise NotAllowed('SK sync v1 support and SSL support at the same time.')
+    if sksync1_compat and (use_ssl or (username or password)):
+        logger.error('Compatibility with SK Sync 1 and SSL/SRP are incompatible options.')
+        raise NotAllowed('SK sync v1 support and SSL/SRP at the same time.')
 
     if sksync1_compat:
         filename_encoding = FILENAME_ENCODING
