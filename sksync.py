@@ -799,6 +799,13 @@ def run_client(config, config_name='client'):
     client_start_sync(host, port, server_path, client_path, recursive=recursive, use_ssl=use_ssl, ssl_server_certfile=ssl_server_certfile, ssl_client_certfile=ssl_client_certfile, ssl_client_keyfile=ssl_client_keyfile, sksync1_compat=sksync1_compat)
 
 
+def set_default_config(config):
+    # defaults
+    config['host'] = config.get('host', '0.0.0.0')
+    config['port'] = config.get('port', SKSYNC_DEFAULT_PORT)
+    return config
+
+
 def main(argv=None):
     if argv is None:
         argv = sys.argv
@@ -818,8 +825,7 @@ def main(argv=None):
         config = {}
 
     # defaults
-    config['host'] = config.get('host', '0.0.0.0')
-    config['port'] = config.get('port', SKSYNC_DEFAULT_PORT)
+    config = set_default_config(config)
 
     if 'client' in argv:
         run_client(config)
