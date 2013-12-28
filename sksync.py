@@ -86,7 +86,7 @@ except ImportError:
     srp = fake_module('srp')
 
 
-FILENAME_ENCODING = 'UTF-8'
+PYSKSYNC_FILENAME_ENCODING = 'UTF-8'
 FILENAME_ENCODING = 'cp1252'  # latin1 encoding used by sksync 1
 language_name, SYSTEM_ENCODING = locale.getdefaultlocale()
 #print language_name, SYSTEM_ENCODING
@@ -96,6 +96,7 @@ SKSYNC_DEFAULT_PORT = 23456
 #SKSYNC_DEFAULT_PORT = 23456 + 1  # FIXME DEBUG not default!!
 #SKSYNC_DEFAULT_PORT = 23456 + 3  # FIXME DEBUG not default!!
 SKSYNC_PROTOCOL_01 = 'sksync 1\n'
+PYSKSYNC_PROTOCOL_01 = 'pysksync 1\n'  # same as SKSYNC_PROTOCOL_01 but using UTF-8 for filenames on wire protocol
 SKSYNC_PROTOCOL_ESTABLISHED = 'Protocol Established\n'
 SKSYNC_PROTOCOL_TYPE_FROM_SERVER_USE_TIME = '2\n'
 SKSYNC_PROTOCOL_TYPE_FROM_SERVER_NO_TIME = '5\n'
@@ -442,7 +443,13 @@ class MyTCPHandler(SocketServer.BaseRequestHandler):
             logger.debug('Received: %r' % response)
 
         # Start of SKSYNC PROTOCOL 01
-        assert response == SKSYNC_PROTOCOL_01, 'response != SKSYNC_PROTOCOL_01, %r' % (response,)
+        assert response in (SKSYNC_PROTOCOL_01, PYSKSYNC_PROTOCOL_01), 'unexpected protocol, %r' % (response,)
+        # PYSKSYNC_PROTOCOL_01 is the same as SKSYNC_PROTOCOL_01 but using UTF-8 for filenames
+        if response == SKSYNC_PROTOCOL_01:
+            filename_encoding = FILENAME_ENCODING
+        elif response == PYSKSYNC_PROTOCOL_01:
+            filename_encoding = PYSKSYNC_FILENAME_ENCODING
+        logger.info('filename_encoding %r', filename_encoding)
 
         message = SKSYNC_PROTOCOL_ESTABLISHED
         len_sent = self.request.send(message)
@@ -490,7 +497,7 @@ class MyTCPHandler(SocketServer.BaseRequestHandler):
             # read all file details
             filename, mtime = parse_file_details(response)
             logger.debug('Received meta data for: %r' % ((filename, mtime),))
-            filename = filename.decode(FILENAME_ENCODING)
+            filename = filename.decode(filename_encoding)
             if os.path.sep == '\\':
                 # Windows
                 filename = filename.replace('/', '\\')  # Unix path conversion to Windows
@@ -559,7 +566,7 @@ class MyTCPHandler(SocketServer.BaseRequestHandler):
                         send_filename = send_filename.decode(SYSTEM_ENCODING)
                     if isinstance(send_filename, unicode):
                         # Need to send binary/byte across wire
-                        send_filename = send_filename.encode(FILENAME_ENCODING)
+                        send_filename = send_filename.encode(filename_encoding)
 
                     file_details = '%s\n%d\n%d\n' % (send_filename, mtime, data_len)
                     logger.debug('file_details: %r', file_details)
@@ -665,6 +672,10 @@ def run_server(config):
          (this is not a normal SK Sync option)
     """
 
+    if config.get('sksync1_compat') and config.get('use_ssl'):
+        logger.error('Compatibility with SK Sync 1 and SSL support are incompatible options.')
+        raise NotAllowed('SK sync v1 support and SSL support at the same time.')
+
     host, port = config['host'], config['port']
 
     logger.info('starting server: %r', (host, port))
@@ -678,7 +689,7 @@ def run_server(config):
     server.serve_forever()
 
 
-def client_start_sync(ip, port, server_path, client_path, sync_type=SKSYNC_PROTOCOL_TYPE_FROM_SERVER_USE_TIME, recursive=False, use_ssl=None, ssl_server_certfile=None, ssl_client_certfile=None, ssl_client_keyfile=None, username=None, password=None):
+def client_start_sync(ip, port, server_path, client_path, sync_type=SKSYNC_PROTOCOL_TYPE_FROM_SERVER_USE_TIME, recursive=False, use_ssl=None, ssl_server_certfile=None, ssl_client_certfile=None, ssl_client_keyfile=None, sksync1_compat=False, username=None, password=None):
     """Implements SK Client, currently only supports:
        * direction =  "from server (use time)" ONLY
     """
@@ -687,9 +698,22 @@ def client_start_sync(ip, port, server_path, client_path, sync_type=SKSYNC_PROTO
     logger.info('client_path %r', client_path)
     real_client_path = os.path.abspath(client_path)
     file_list_str = ''
+
     username = username or ''
     password = password or ''
-    
+
+    if sksync1_compat and use_ssl:
+        logger.error('Compatibility with SK Sync 1 and SSL support are incompatible options.')
+        raise NotAllowed('SK sync v1 support and SSL support at the same time.')
+
+    if sksync1_compat:
+        filename_encoding = FILENAME_ENCODING
+        sync_protocol = SKSYNC_PROTOCOL_01
+    else:
+        filename_encoding = PYSKSYNC_FILENAME_ENCODING
+        sync_protocol = PYSKSYNC_PROTOCOL_01
+
+    logger.info('filename_encoding %r', filename_encoding)
     logger.info('determine client files')
     file_list = get_file_listings(real_client_path, recursive=recursive)
     file_list_info = []
@@ -700,7 +724,7 @@ def client_start_sync(ip, port, server_path, client_path, sync_type=SKSYNC_PROTO
                 filename = filename.decode(SYSTEM_ENCODING)
             if isinstance(filename, unicode):
                 # Need to send binary/byte across wire
-                filename = filename.encode(FILENAME_ENCODING)
+                filename = filename.encode(filename_encoding)
             file_details = '%d %s' % (mtime, filename)
             file_list_info.append(file_details)
         except UnicodeEncodeError:
@@ -841,7 +865,7 @@ def client_start_sync(ip, port, server_path, client_path, sync_type=SKSYNC_PROTO
             raise PAKEFailure()
         # usr.K is now a shared key available to use
 
-    message = SKSYNC_PROTOCOL_01
+    message = sync_protocol
     len_sent = s.send(message)
     logger.debug('sent: len %d %r' % (len_sent, message, ))
     
@@ -863,10 +887,10 @@ def client_start_sync(ip, port, server_path, client_path, sync_type=SKSYNC_PROTO
     # example: '0\n/tmp/skmemos\n/sdcard/skmemos\n\n'
     if isinstance(server_path, unicode):
         # Need to send binary/byte across wire
-        server_path = server_path.encode(FILENAME_ENCODING)
+        server_path = server_path.encode(filename_encoding)
     if isinstance(client_path, unicode):
         # Need to send binary/byte across wire
-        client_path = client_path.encode(FILENAME_ENCODING)
+        client_path = client_path.encode(filename_encoding)
 
     if file_list_str:
         # FIXME this could be refactored....
@@ -888,7 +912,7 @@ def client_start_sync(ip, port, server_path, client_path, sync_type=SKSYNC_PROTO
     while response != '\n':
         filename = response[:-1]  # loose trailing \n
         logger.debug('filename: %r' % filename)
-        filename = filename.decode(FILENAME_ENCODING)
+        filename = filename.decode(filename_encoding)
         mtime = reader.next()
         logger.debug('mtime: %r' % mtime)
         mtime = norm_mtime(mtime)
@@ -929,6 +953,7 @@ def run_client(config, config_name='client'):
     if host == '0.0.0.0':
         host = 'localhost'
 
+    sksync1_compat = config.get('sksync1_compat')
     client_config = config[config_name]
     server_path, client_path = client_config['server_path'], client_config['client_path']
     recursive = client_config.get('recursive')
@@ -940,7 +965,7 @@ def run_client(config, config_name='client'):
 
     ssl_client_certfile = config.get('ssl_client_certfile')
     ssl_client_keyfile = config.get('ssl_client_keyfile')
-    client_start_sync(host, port, server_path, client_path, recursive=recursive, use_ssl=use_ssl, ssl_server_certfile=ssl_server_certfile, ssl_client_certfile=ssl_client_certfile, ssl_client_keyfile=ssl_client_keyfile, username=username, password=password)
+    client_start_sync(host, port, server_path, client_path, recursive=recursive, use_ssl=use_ssl, ssl_server_certfile=ssl_server_certfile, ssl_client_certfile=ssl_client_certfile, ssl_client_keyfile=ssl_client_keyfile, sksync1_compat=sksync1_compat, username=username, password=password)
 
 
 def main(argv=None):
