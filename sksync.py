@@ -613,7 +613,6 @@ def client_start_sync(ip, port, server_path, client_path, sync_type=SKSYNC_PROTO
     """Implements SK Client, currently only supports:
        * direction =  "from server (use time)" ONLY
     """
-    logger.info('client connecting to server %s:%d', ip, port)
     logger.info('server_path %r', server_path)
     logger.info('client_path %r', client_path)
     real_client_path = os.path.abspath(client_path)
@@ -623,6 +622,9 @@ def client_start_sync(ip, port, server_path, client_path, sync_type=SKSYNC_PROTO
         logger.error('Compatibility with SK Sync 1 and SSL support are incompatible options.')
         raise NotAllowed('SK sync v1 support and SSL support at the same time.')
 
+    sync_timer = SimpleTimer()
+    sync_timer.start()
+
     if sksync1_compat:
         filename_encoding = FILENAME_ENCODING
         sync_protocol = SKSYNC_PROTOCOL_01
@@ -631,7 +633,7 @@ def client_start_sync(ip, port, server_path, client_path, sync_type=SKSYNC_PROTO
         sync_protocol = PYSKSYNC_PROTOCOL_01
 
     logger.info('filename_encoding %r', filename_encoding)
-    logger.info('determine client files')
+    logger.info('determining client files')
     file_list = get_file_listings(real_client_path, recursive=recursive)
     file_list_info = []
     for filename, mtime in file_list:
@@ -657,6 +659,7 @@ def client_start_sync(ip, port, server_path, client_path, sync_type=SKSYNC_PROTO
     file_list_str = '\n'.join(file_list_info)
 
     # Connect to the server
+    logger.info('client connecting to server %s:%d', ip, port)
     s = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
 
     if use_ssl:
@@ -771,7 +774,10 @@ def client_start_sync(ip, port, server_path, client_path, sync_type=SKSYNC_PROTO
 
     # Clean up
     s.close()
-    logger.info('Number of files sent by server %d', received_file_count)
+    sync_timer.stop()
+    logger.info('Number of files sent by server %d in %s', received_file_count, sync_timer)
+    if delta != 0:
+        logger.info('Skipped %d', delta)
     logger.info('disconnected')
 
 
