@@ -752,7 +752,7 @@ def client_start_sync(ip, port, server_path, client_path, sync_type=SKSYNC_PROTO
         logger.debug('filesize: %r' % filesize)
         filesize = int(filesize)
         logger.debug('filesize: %r' % filesize)
-        logger.info('processing %r' % ((filename, filesize, mtime),))
+        logger.info('processing %r' % ((filename, filesize, mtime),))  # TODO add option to supress this?
         
         # now read filesize bytes....
         filecontents = reader.recv(filesize)
