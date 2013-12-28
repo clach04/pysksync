@@ -387,11 +387,17 @@ class MyTCPHandler(SocketServer.BaseRequestHandler):
         server_path = server_path[:-1]  # loose trailing \n
         server_path = os.path.abspath(server_path)
         logger.debug('server_path abs: %r' % server_path)
+        server_dir_whitelist = []
         if config['server_dir_whitelist']:
-            if server_path not in config['server_dir_whitelist']:
+            server_dir_whitelist = []
+            for tmp_path in config['server_dir_whitelist']:
+                # clean path so we can use string comparisons for dir equality check
+                tmp_path = os.path.abspath(tmp_path)
+                server_dir_whitelist.append(tmp_path)
+            if server_path not in server_dir_whitelist:
                 if config.get('server_dir_whitelist_policy', "deny") == 'silent':
                     # silently ignore client's path request, use first white listed dir
-                    server_path = config['server_dir_whitelist'][0]
+                    server_path = server_dir_whitelist[0]
                     logger.info('OVERRIDE server_path: %r', server_path)
                 else:
                     logger.error('client requested path %r which is not in "server_dir_whitelist"', server_path)
