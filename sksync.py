@@ -990,6 +990,10 @@ def set_default_config(config):
     config['port'] = config.get('port', SKSYNC_DEFAULT_PORT)
     config['sksync1_compat'] = config.get('sksync1_compat', False)
     config['use_ssl'] = config.get('use_ssl', False)
+    if config['sksync1_compat']:
+        config['require_auth'] = config.get('require_auth', False)
+    else:
+        config['require_auth'] = config.get('require_auth', True)
     return config
 
 
