@@ -149,7 +149,7 @@ class TestFileWalk(unittest.TestCase):
 
 
 class TestSKSync(unittest.TestCase):
-    
+
     def setUp(self):
         # NOTE using Python unittest, setUp() is called before EACH and every
         self.server_dir = os.path.join('tmp_testsuitedir', 'server')
@@ -157,7 +157,8 @@ class TestSKSync(unittest.TestCase):
         create_test_files(testdir=self.server_dir)
         safe_rmtree(self.client_dir)
         safe_mkdir(self.client_dir)
-    
+        self.config = {}
+
     def test_sync_from_server_with_times_to_empty_client_directory(self):
         safe_rmtree(self.client_dir)
         safe_mkdir(self.client_dir)
@@ -178,7 +179,7 @@ class TestSKSync(unittest.TestCase):
         check_file_contents_and_mtime(self.server_dir, 'test3.txt')
 
         # do sync
-        perform_sync(self.server_dir, self.client_dir)
+        perform_sync(self.server_dir, self.client_dir, config=self.config)
         
         # check files exist
         self.assertTrue(os.path.isfile(os.path.join(self.client_dir, 'test1.txt')))
@@ -210,7 +211,7 @@ class TestSKSync(unittest.TestCase):
             check_file_contents_and_mtime(self.server_dir, filename)
 
         # do sync
-        perform_sync(self.server_dir, self.client_dir)
+        perform_sync(self.server_dir, self.client_dir, config=self.config)
         
         # check files exist
         for filename in test_fixtures:
@@ -240,7 +241,7 @@ class TestSKSync(unittest.TestCase):
             check_file_contents_and_mtime(self.server_dir, filename)
 
         # do sync
-        perform_sync(self.server_dir, self.client_dir)
+        perform_sync(self.server_dir, self.client_dir, config=self.config)
         
         # check files exist
         for filename in test_fixtures:
@@ -270,7 +271,7 @@ class TestSKSync(unittest.TestCase):
             check_file_contents_and_mtime(self.server_dir, filename)
 
         # do sync
-        perform_sync(self.server_dir, self.client_dir)
+        perform_sync(self.server_dir, self.client_dir, config=self.config)
         
         # check files exist
         for filename in test_fixtures:
