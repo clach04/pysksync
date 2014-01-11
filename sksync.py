@@ -113,7 +113,7 @@ if ssl:
 
 
 # PYSKSYNC specific constants
-PYSKSYNC_CR_START = 'PYSKSYNC SRP START:'
+PYSKSYNC_CR_START = 'PYSKSYNC SRP START:'  # Challenge Response start message
 
 
 class BaseSkSyncException(Exception):
