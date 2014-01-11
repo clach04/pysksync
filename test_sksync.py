@@ -74,13 +74,24 @@ def create_test_files(testdir='tmp_testsuitedir', data_override=None):
         os.utime(filename, (mtime, mtime))
 
 
-def perform_sync(server_dir, client_dir, HOST='127.0.0.1', PORT=get_random_port(), recursive=False):
-    
+def perform_sync(server_dir, client_dir, HOST='127.0.0.1', PORT=get_random_port(), recursive=False, config=None):
+    config = config or {}
+    config['host'] = HOST
+    config['port'] = PORT
+    #config['server_path'] = server_dir
+    #config['client_path'] = client_dir
+    config['testing'] = {}
+    config['testing']['server_path'] = server_dir
+    config['testing']['client_path'] = client_dir
+    config['testing']['recursive'] = recursive
+    config = sksync.set_default_config(config)
+
     # Start sync server in thread
     server = sksync.MyThreadedTCPServer((HOST, PORT), sksync.MyTCPHandler)
     try:
         host, port = server.server_address
-        
+        server.sksync_config = config
+
         # Start a thread with the server, in turn that thread will then start additional threads
         # One additional thread for each client request/connection
         server_thread = threading.Thread(target=server.serve_forever)
@@ -90,7 +101,7 @@ def perform_sync(server_dir, client_dir, HOST='127.0.0.1', PORT=get_random_port(
         #print "Server loop running in thread:", server_thread.name
         
         # do sync
-        sksync.client_start_sync(host, port, server_dir, client_dir, recursive=recursive)
+        sksync.run_client(config, config_name='testing')
     finally:
         server.shutdown()
 
