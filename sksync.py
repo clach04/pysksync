@@ -559,6 +559,7 @@ class MyTCPHandler(SocketServer.BaseRequestHandler):
         os.chdir(server_path)
         sent_count = 0
         skip_count = 0
+        byte_count_sent = 0
         try:
             for filename in missing_from_client:
                 try:
@@ -584,6 +585,7 @@ class MyTCPHandler(SocketServer.BaseRequestHandler):
                     self.request.send(file_details)
                     self.request.send(data)
                     sent_count += 1
+                    byte_count_sent += len(data)
                 except UnicodeEncodeError:
                     # Skip this file
                     logger.error('Encoding error - unable to access and process %r, ignoring', filename)
@@ -599,7 +601,7 @@ class MyTCPHandler(SocketServer.BaseRequestHandler):
             skip_count_str = ', skipped %d' % skip_count
         else:
             skip_count_str = ''
-        logger.info('Successfully checked %r, sent %r%s files in %s', len(server_files), sent_count, skip_count_str, sync_timer)
+        logger.info('Successfully checked %r, sent %r bytes in %r%s files in %s', len(server_files), byte_count_sent, sent_count, skip_count_str, sync_timer)
         logger.info('Client %r disconnected' % (self.request.getpeername(),))
 
 
@@ -921,6 +923,7 @@ def client_start_sync(ip, port, server_path, client_path, sync_type=SKSYNC_PROTO
     response = reader.next()
     logger.debug('Received: %r' % response)
     received_file_count = 0
+    byte_count_recv = 0
     while response != '\n':
         filename = response[:-1]  # loose trailing \n
         logger.debug('filename: %r' % filename)
@@ -949,6 +952,7 @@ def client_start_sync(ip, port, server_path, client_path, sync_type=SKSYNC_PROTO
         f.close()
         os.utime(full_filename, (mtime, mtime))
         received_file_count += 1
+        byte_count_recv += len(filecontents)
 
         # any more files?
         response = reader.next()
@@ -957,7 +961,7 @@ def client_start_sync(ip, port, server_path, client_path, sync_type=SKSYNC_PROTO
     # Clean up
     s.close()
     sync_timer.stop()
-    logger.info('Number of files sent by server %d in %s', received_file_count, sync_timer)
+    logger.info('%r bytes in %d files sent by server in %s', byte_count_recv, received_file_count, sync_timer)
     if delta != 0:
         logger.info('Skipped %d', delta)
     logger.info('disconnected')
