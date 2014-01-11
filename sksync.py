@@ -317,7 +317,7 @@ class MyTCPHandler(SocketServer.BaseRequestHandler):
     """
 
     def handle(self):
-        logger.info('Client %r connected' % (self.request.getpeername(),))
+        logger.info('Client %r connected', (self.request.getpeername(),))
         config = getattr(self.server, 'sksync_config', {})
         config['server_dir_whitelist'] = config.get('server_dir_whitelist', [])
 
@@ -330,8 +330,8 @@ class MyTCPHandler(SocketServer.BaseRequestHandler):
                 logger.info('Attempting SSL session')
                 ssl_server_certfile = config.get('ssl_server_certfile')
                 ssl_server_keyfile = config.get('ssl_server_keyfile')
-                logger.info('using SSL certificate file  %r' % ssl_server_certfile)
-                logger.info('using SSL key file  %r' % ssl_server_keyfile)
+                logger.info('using SSL certificate file  %r', ssl_server_certfile)
+                logger.info('using SSL key file  %r', ssl_server_keyfile)
 
                 if config.get('ssl_client_certfile'):
                     self.request = ssl.wrap_socket(self.request,
@@ -349,12 +349,12 @@ class MyTCPHandler(SocketServer.BaseRequestHandler):
                                     ssl_version=SSL_VERSION)
                 logger.info('SSL connected using %r', self.request.cipher())
             except ssl.SSLError, info:
-                logger.error('Error starting SSL, check certificate and key are valid. %r' % info)
+                logger.error('Error starting SSL, check certificate and key are valid. %r', info)
                 # could be a bad client....
                 return
         reader = SKBufferedSocket(self.request)
         response = reader.next()
-        logger.debug('Received: %r' % response)
+        logger.debug('Received: %r', response)
         assert response in (SKSYNC_PROTOCOL_01, PYSKSYNC_PROTOCOL_01)
         # PYSKSYNC_PROTOCOL_01 is the same as SKSYNC_PROTOCOL_01 but using UTF-8 for filenames
         if response == SKSYNC_PROTOCOL_01:
@@ -365,15 +365,15 @@ class MyTCPHandler(SocketServer.BaseRequestHandler):
 
         message = SKSYNC_PROTOCOL_ESTABLISHED
         len_sent = self.request.send(message)
-        logger.debug('sent: len %d %r' % (len_sent, message, ))
+        logger.debug('sent: len %d %r', len_sent, message)
 
         response = reader.next()
-        logger.debug('Received: %r' % response)
+        logger.debug('Received: %r', response)
         assert response in (SKSYNC_PROTOCOL_TYPE_FROM_SERVER_USE_TIME, ), repr(response)  # type of sync
         # FROM SERVER appears to use the same protocol, the difference is in the server logic for working out which files to send to the client
 
         response = reader.next()
-        logger.debug('Received: %r' % response)
+        logger.debug('Received: %r', response)
         assert response in (SKSYNC_PROTOCOL_NON_RECURSIVE, SKSYNC_PROTOCOL_RECURSIVE)  # start of path (+file) info
         
         if response == SKSYNC_PROTOCOL_NON_RECURSIVE:
@@ -383,10 +383,10 @@ class MyTCPHandler(SocketServer.BaseRequestHandler):
             recursive = True
         
         server_path = reader.next()
-        logger.debug('server_path: %r' % server_path)
+        logger.debug('server_path: %r', server_path)
         server_path = server_path[:-1]  # loose trailing \n
         server_path = os.path.abspath(server_path)
-        logger.debug('server_path abs: %r' % server_path)
+        logger.debug('server_path abs: %r', server_path)
         server_dir_whitelist = []
         if config['server_dir_whitelist']:
             server_dir_whitelist = []
@@ -404,35 +404,35 @@ class MyTCPHandler(SocketServer.BaseRequestHandler):
                     raise NotAllowed('access to path %r' % server_path)
 
         client_path = reader.next()
-        logger.debug('client_path: %r' % client_path)
+        logger.debug('client_path: %r', client_path)
 
         # possible first file details
         response = reader.next()
-        logger.debug('Received: %r' % response)
+        logger.debug('Received: %r', response)
         client_files = {}
         while response != '\n':
             # TODO start counting and other stats
             # read all file details
             filename, mtime = parse_file_details(response)
-            logger.debug('Received meta data for: %r' % ((filename, mtime),))
+            logger.debug('Received meta data for: %r', ((filename, mtime),))
             filename = filename.decode(filename_encoding)
             if os.path.sep == '\\':
                 # Windows
                 filename = filename.replace('/', '\\')  # Unix path conversion to Windows
             client_files[filename] = mtime
             response = reader.next()
-            logger.debug('Received: %r' % response)
+            logger.debug('Received: %r', response)
         
         # we're done receiving data from client now
         self.request.send('\n')
         
         # TODO start counting and other stats
         # TODO output count and other stats
-        logger.info('Number of files on client %r ' % (len(client_files),))
+        logger.info('Number of files on client %r ', (len(client_files),))
         # NOTE if sync type is SKSYNC_PROTOCOL_TYPE_FROM_SERVER_* and
         # server_path does not exist, SK Sync simply returns 0 files
         server_files = get_file_listings(server_path, recursive=recursive, include_size=True, return_list=False, force_unicode=True)
-        logger.info('Number of files on server %r ' % (len(server_files),))
+        logger.info('Number of files on server %r ', (len(server_files),))
         
         server_files_set = set(server_files)
         client_files_set = set(client_files)
@@ -465,7 +465,7 @@ class MyTCPHandler(SocketServer.BaseRequestHandler):
         
         # send new files to the client
         # TODO deal with incoming files from client
-        logger.info('Number of files for server to send %r out of %r ' % (len(missing_from_client), len(server_files)))
+        logger.info('Number of files for server to send %r out of %r ', len(missing_from_client), len(server_files))
         # TODO consider a progress bar/percent base on number of missing files (not byte count)
         current_dir = os.getcwd()  # TODO non-ascii; os.getcwdu()
         os.chdir(server_path)
@@ -515,7 +515,7 @@ class MyTCPHandler(SocketServer.BaseRequestHandler):
         else:
             skip_count_str = ''
         logger.info('Successfully checked %r, sent %r bytes in %r%s files in %s', len(server_files), byte_count_sent, sent_count, skip_count_str, sync_timer)
-        logger.info('Client %r disconnected' % (self.request.getpeername(),))
+        logger.info('Client %r disconnected', self.request.getpeername())
 
 
 class StoppableTCPServer(SocketServer.ThreadingTCPServer):
@@ -670,7 +670,7 @@ def client_start_sync(ip, port, server_path, client_path, sync_type=SKSYNC_PROTO
         try:
             logger.info('Attempting SSL session')
             if ssl_server_certfile:
-                logger.info('using SSL certificate file  %r' % ssl_server_certfile)
+                logger.info('using SSL certificate file  %r', ssl_server_certfile)
                 if ssl_client_certfile:
                     s = ssl.wrap_socket(s,
                                ca_certs=ssl_server_certfile,
@@ -692,7 +692,7 @@ def client_start_sync(ip, port, server_path, client_path, sync_type=SKSYNC_PROTO
             s.connect((ip, port))
             logger.info('SSL connected using %r', s.cipher())
         except ssl.SSLError, info:
-            logger.error('Error starting SSL connection, check SSL is enabled on server and certificate and key are valid. %r' % info)
+            logger.error('Error starting SSL connection, check SSL is enabled on server and certificate and key are valid. %r', info)
             return
     else:
         s.connect((ip, port))
@@ -700,18 +700,18 @@ def client_start_sync(ip, port, server_path, client_path, sync_type=SKSYNC_PROTO
 
     message = sync_protocol
     len_sent = s.send(message)
-    logger.debug('sent: len %d %r' % (len_sent, message, ))
+    logger.debug('sent: len %d %r', len_sent, message)
     
     reader = SKBufferedSocket(s)
     # Receive a response
     response = reader.next()
-    logger.debug('Received: %r' % response)
+    logger.debug('Received: %r', response)
     assert response == SKSYNC_PROTOCOL_ESTABLISHED
 
     # type of sync
     message = sync_type
     len_sent = s.send(message)
-    logger.debug('sent: len %d %r' % (len_sent, message, ))
+    logger.debug('sent: len %d %r', len_sent, message)
     
     recursive_type = SKSYNC_PROTOCOL_NON_RECURSIVE
     if recursive:
@@ -732,36 +732,36 @@ def client_start_sync(ip, port, server_path, client_path, sync_type=SKSYNC_PROTO
     else:
         message = recursive_type + server_path + '\n' + client_path + '\n\n'
     len_sent = s.send(message)
-    logger.debug('sent: len %d %r' % (len_sent, message, ))
+    logger.debug('sent: len %d %r', len_sent, message)
 
     # Receive a response
     response = reader.next()
-    logger.debug('Received: %r' % response)
+    logger.debug('Received: %r', response)
     assert response == '\n'
 
     # if get CR end of session, otherwise get files
     response = reader.next()
-    logger.debug('Received: %r' % response)
+    logger.debug('Received: %r', response)
     received_file_count = 0
     byte_count_recv = 0
     while response != '\n':
         filename = response[:-1]  # loose trailing \n
-        logger.debug('filename: %r' % filename)
+        logger.debug('filename: %r', filename)
         filename = filename.decode(filename_encoding)
         mtime = reader.next()
-        logger.debug('mtime: %r' % mtime)
+        logger.debug('mtime: %r', mtime)
         mtime = norm_mtime(mtime)
         mtime = unnorm_mtime(mtime)
-        logger.debug('mtime: %r' % mtime)
+        logger.debug('mtime: %r', mtime)
         filesize = reader.next()
-        logger.debug('filesize: %r' % filesize)
+        logger.debug('filesize: %r', filesize)
         filesize = int(filesize)
-        logger.debug('filesize: %r' % filesize)
-        logger.info('processing %r' % ((filename, filesize, mtime),))  # TODO add option to supress this?
+        logger.debug('filesize: %r', filesize)
+        logger.info('processing %r', ((filename, filesize, mtime),))  # TODO add option to supress this?
         
         # now read filesize bytes....
         filecontents = reader.recv(filesize)
-        logger.debug('filecontents: %r' % filecontents)
+        logger.debug('filecontents: %r', filecontents)
         
         full_filename = os.path.join(real_client_path, filename)
         full_filename_dir = os.path.dirname(full_filename)
@@ -776,7 +776,7 @@ def client_start_sync(ip, port, server_path, client_path, sync_type=SKSYNC_PROTO
 
         # any more files?
         response = reader.next()
-        logger.debug('Received: %r' % response)
+        logger.debug('Received: %r', response)
 
     # Clean up
     s.close()
