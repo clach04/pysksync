@@ -16,6 +16,7 @@ import select
 import logging
 import glob
 import errno
+import binascii
 import locale
 
 try:
@@ -68,11 +69,29 @@ else:
     load_json = json.loads
 
 
+def fake_module(name):
+    # Fail with a clear message (possibly at an unexpected time)
+    class MissingModule(object):
+        def __getattr__(self, attr):
+            raise ImportError('No module named %s' % name)
+
+        def __nonzero__(self):
+            return False
+
+    return MissingModule()
+
+try:
+    import srp
+except ImportError:
+    srp = fake_module('srp')
+
+
 PYSKSYNC_FILENAME_ENCODING = 'UTF-8'
 FILENAME_ENCODING = 'cp1252'  # latin1 encoding used by sksync 1
 language_name, SYSTEM_ENCODING = locale.getdefaultlocale()
 #print language_name, SYSTEM_ENCODING
 
+# SK Sync specific constants
 SKSYNC_DEFAULT_PORT = 23456
 #SKSYNC_DEFAULT_PORT = 23456 + 1  # FIXME DEBUG not default!!
 #SKSYNC_DEFAULT_PORT = 23456 + 3  # FIXME DEBUG not default!!
@@ -93,11 +112,19 @@ if ssl:
     SSL_VERSION = ssl.PROTOCOL_TLSv1
 
 
+# PYSKSYNC specific constants
+PYSKSYNC_CR_START = 'PYSKSYNC SRP START:'
+
+
 class BaseSkSyncException(Exception):
     '''Base SK Sync exception'''
 
 class NotAllowed(BaseSkSyncException):
     '''Requested operation not allowed exception'''
+
+class PAKEFailure(BaseSkSyncException):
+    '''Password authenticated key agreement exception
+    Either client has wrong password, or server does.'''
 
 
 logging.basicConfig()
@@ -320,6 +347,9 @@ class MyTCPHandler(SocketServer.BaseRequestHandler):
         logger.info('Client %r connected' % (self.request.getpeername(),))
         config = getattr(self.server, 'sksync_config', {})
         config['server_dir_whitelist'] = config.get('server_dir_whitelist', [])
+        config['users'] = config.get('users', {})
+        config['require_auth'] = config.get('require_auth', True)
+
 
         sync_timer = SimpleTimer()
         sync_timer.start()
@@ -355,7 +385,65 @@ class MyTCPHandler(SocketServer.BaseRequestHandler):
         reader = SKBufferedSocket(self.request)
         response = reader.next()
         logger.debug('Received: %r' % response)
-        assert response in (SKSYNC_PROTOCOL_01, PYSKSYNC_PROTOCOL_01)
+
+        # Start of PYSKSYNC challenge/response
+        if config['require_auth'] or response.startswith(PYSKSYNC_CR_START):
+            if not response.startswith(PYSKSYNC_CR_START):
+                # client is not starting PAKE session
+                raise PAKEFailure()
+
+            # SRP 6a
+            # As per spec, errors result in an abort, PAKEFailure is raised.
+            # Nothing helpful is sent to the peer.
+            logger.info('authenticated connection requested')
+            try:
+                I_hex, A_hex = response[len(PYSKSYNC_CR_START):].split()
+            except ValueError:
+                # bad user/verifier
+                raise PAKEFailure()
+            I, A = binascii.unhexlify(I_hex), binascii.unhexlify(A_hex)
+            logger.info('attempting authentication for user %s' % I)
+
+            #salt, vkey = config['users'][I]['authsrp']
+            authsrp = config['users'].get(I, {}).get('authsrp')
+            if not authsrp:
+                # User does not exist
+                raise PAKEFailure()
+            try:
+                salt, vkey = authsrp
+            except ValueError:
+                # bad user/verifier entry
+                raise PAKEFailure()
+            salt, vkey = binascii.unhexlify(salt), binascii.unhexlify(vkey)
+            svr = srp.Verifier(I, salt, vkey, A)
+            s, B = svr.get_challenge()
+            if s is None or B is None:
+                raise PAKEFailure()
+            message = '%s %s\n' % (binascii.hexlify(s), binascii.hexlify(B))
+            logger.debug('sending: len %d %r' % (len(message), message, ))
+            len_sent = self.request.send(message)
+            logger.debug('sent: len %d' % (len_sent, ))
+
+            response = reader.next()
+            logger.debug('Received: %r' % response)
+            M = binascii.unhexlify(response.strip())
+            HAMK = svr.verify_session(M)
+            if HAMK is None:
+                raise PAKEFailure()
+            message = '%s\n' % (binascii.hexlify(HAMK),)
+            logger.debug('sending: len %d %r' % (len(message), message, ))
+            len_sent = self.request.send(message)
+            logger.debug('sent: len %d' % (len_sent, ))
+            if not svr.authenticated():
+                raise PAKEFailure()
+            # svr.K is now a shared key available to use
+
+            # Resume SKSYNC PROTOCOL
+            response = reader.next()
+            logger.debug('Received: %r' % response)
+
+        # Start of SKSYNC PROTOCOL 01
+        assert response in (SKSYNC_PROTOCOL_01, PYSKSYNC_PROTOCOL_01), 'unexpected protocol, %r' % (response,)
         # PYSKSYNC_PROTOCOL_01 is the same as SKSYNC_PROTOCOL_01 but using UTF-8 for filenames
         if response == SKSYNC_PROTOCOL_01:
             filename_encoding = FILENAME_ENCODING
@@ -593,9 +681,9 @@ def run_server(config):
     """
 
     config = set_default_config(config)
-    if config.get('sksync1_compat') and config.get('use_ssl'):
-        logger.error('Compatibility with SK Sync 1 and SSL support are incompatible options.')
-        raise NotAllowed('SK sync v1 support and SSL support at the same time.')
+    if config.get('sksync1_compat') and (config.get('use_ssl') or config.get('require_auth', True)):
+        logger.error('Compatibility with SK Sync 1 and use_ssl/require_auth are incompatible options.')
+        raise NotAllowed('SK sync v1 support and use_ssl/require_auth at the same time.')
 
     host, port = config['host'], config['port']
 
@@ -610,7 +698,7 @@ def run_server(config):
     server.serve_forever()
 
 
-def client_start_sync(ip, port, server_path, client_path, sync_type=SKSYNC_PROTOCOL_TYPE_FROM_SERVER_USE_TIME, recursive=False, use_ssl=None, ssl_server_certfile=None, ssl_client_certfile=None, ssl_client_keyfile=None, sksync1_compat=False):
+def client_start_sync(ip, port, server_path, client_path, sync_type=SKSYNC_PROTOCOL_TYPE_FROM_SERVER_USE_TIME, recursive=False, use_ssl=None, ssl_server_certfile=None, ssl_client_certfile=None, ssl_client_keyfile=None, sksync1_compat=False, username=None, password=None):
     """Implements SK Client, currently only supports:
        * direction =  "from server (use time)" ONLY
     """
@@ -619,9 +707,12 @@ def client_start_sync(ip, port, server_path, client_path, sync_type=SKSYNC_PROTO
     real_client_path = os.path.abspath(client_path)
     file_list_str = ''
 
-    if sksync1_compat and use_ssl:
-        logger.error('Compatibility with SK Sync 1 and SSL support are incompatible options.')
-        raise NotAllowed('SK sync v1 support and SSL support at the same time.')
+    username = username or ''
+    password = password or ''
+
+    if sksync1_compat and (use_ssl or (username or password)):
+        logger.error('Compatibility with SK Sync 1 and SSL/SRP are incompatible options.')
+        raise NotAllowed('SK sync v1 support and SSL/SRP at the same time.')
 
     sync_timer = SimpleTimer()
     sync_timer.start()
@@ -694,12 +785,102 @@ def client_start_sync(ip, port, server_path, client_path, sync_type=SKSYNC_PROTO
     else:
         s.connect((ip, port))
     logger.info('connected')
+    reader = SKBufferedSocket(s)
+
+    if username or password:
+        # SRP-6a - Secure Remote Password protocol
+        """http://srp.stanford.edu/design.html
+
+          N    A large safe prime (N = 2q+1, where q is prime)
+               All arithmetic is done modulo N.
+          g    A generator modulo N
+          k    Multiplier parameter (k = H(N, g) in SRP-6a, k = 3 for legacy SRP-6)
+          s    User's salt
+          I    Username
+          p    Cleartext Password
+          H()  One-way hash function
+          ^    (Modular) Exponentiation
+          u    Random scrambling parameter
+          a,b  Secret ephemeral values
+          A,B  Public ephemeral values
+          x    Private key (derived from p and s)
+          v    Password verifier
+
+        The host stores passwords using the following formula:
+
+          x = H(s, p)               (s is chosen randomly)
+          v = g^x                   (computes password verifier)
+
+        The host then keeps {I, s, v} in its password database.
+        The authentication protocol itself goes as follows:
+
+        User -> Host:  I, A = g^a                  (identifies self, a = random number)
+        Host -> User:  s, B = kv + g^b             (sends salt, b = random number)
+
+                Both:  u = H(A, B)
+
+                User:  x = H(s, p)                 (user enters password)
+                User:  S = (B - kg^x) ^ (a + ux)   (computes session key)
+                User:  K = H(S)
+
+                Host:  S = (Av^u) ^ b              (computes session key)
+                Host:  K = H(S)
+
+        Now the two parties have a shared, strong session key K. To complete
+        authentication, they need to prove to each other that their keys
+        match. One possible way:
+
+        User -> Host:  M = H(H(N) xor H(g), H(I), s, A, B, K)
+        Host -> User:  H(A, M, K)
+
+        The two parties also employ the following safeguards:
+
+            The user will abort if he receives B == 0 (mod N) or u == 0.
+            The host will abort if it detects that A == 0 (mod N).
+            The user must show his proof of K first. If the server detects that
+                the user's proof is incorrect, it must abort without showing its
+                own proof of K. 
+        """
+        logger.info('attempting authentication for user %s' % username)
+        usr = srp.User(username, password)
+        I, A = usr.start_authentication()
+
+        message = '%s%s %s\n' % (PYSKSYNC_CR_START, binascii.hexlify(I), binascii.hexlify(A))
+        logger.debug('sending: len %d %r' % (len(message), message, ))
+        len_sent = s.send(message)
+        logger.debug('sent: len %d' % (len_sent, ))
+
+        response = reader.next()
+        logger.debug('Received: %r' % response)
+        s_hex, B_hex = response.split()
+        _s, B = binascii.unhexlify(s_hex), binascii.unhexlify(B_hex)
+
+        if s is None or B is None:
+            raise PAKEFailure()
+
+        M = usr.process_challenge(_s, B)
+        if M is None:
+            raise PAKEFailure()
+        message = '%s\n' % (binascii.hexlify(M),)
+        logger.debug('sending: len %d %r' % (len(message), message, ))
+        len_sent = s.send(message)
+        logger.debug('sent: len %d' % (len_sent, ))
+
+        response = reader.next()
+        logger.debug('Received: %r' % response)
+        HAMK = binascii.unhexlify(response.strip())
+        if HAMK is None:
+            raise PAKEFailure()
+
+        usr.verify_session(HAMK)
+        if not usr.authenticated():
+            raise PAKEFailure()
+        # usr.K is now a shared key available to use
 
     message = sync_protocol
     len_sent = s.send(message)
     logger.debug('sent: len %d %r' % (len_sent, message, ))
     
-    reader = SKBufferedSocket(s)
     # Receive a response
     response = reader.next()
     logger.debug('Received: %r' % response)
@@ -793,12 +974,14 @@ def run_client(config, config_name='client'):
     server_path, client_path = client_config['server_path'], client_config['client_path']
     recursive = client_config.get('recursive')
 
+    username, password = config.get('username'), config.get('password')
+
     use_ssl = config.get('use_ssl')
     ssl_server_certfile = config.get('ssl_server_certfile')
 
     ssl_client_certfile = config.get('ssl_client_certfile')
     ssl_client_keyfile = config.get('ssl_client_keyfile')
-    client_start_sync(host, port, server_path, client_path, recursive=recursive, use_ssl=use_ssl, ssl_server_certfile=ssl_server_certfile, ssl_client_certfile=ssl_client_certfile, ssl_client_keyfile=ssl_client_keyfile, sksync1_compat=sksync1_compat)
+    client_start_sync(host, port, server_path, client_path, recursive=recursive, use_ssl=use_ssl, ssl_server_certfile=ssl_server_certfile, ssl_client_certfile=ssl_client_certfile, ssl_client_keyfile=ssl_client_keyfile, sksync1_compat=sksync1_compat, username=username, password=password)
 
 
 def set_default_config(config):
@@ -807,6 +990,10 @@ def set_default_config(config):
     config['port'] = config.get('port', SKSYNC_DEFAULT_PORT)
     config['sksync1_compat'] = config.get('sksync1_compat', False)
     config['use_ssl'] = config.get('use_ssl', False)
+    if config['sksync1_compat']:
+        config['require_auth'] = config.get('require_auth', False)
+    else:
+        config['require_auth'] = config.get('require_auth', True)
     return config
 
 
@@ -816,6 +1003,7 @@ def main(argv=None):
 
     # TODO proper argument parsing
     logger.setLevel(logging.INFO)
+    #logger.setLevel(logging.DEBUG)
     try:
         conf_filename = argv[1]
     except IndexError:
@@ -830,6 +1018,7 @@ def main(argv=None):
 
     # defaults
     config = set_default_config(config)
+    #print dump_json(config, indent=4)
 
     if 'client' in argv:
         run_client(config)
