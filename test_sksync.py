@@ -148,8 +148,7 @@ class TestFileWalk(unittest.TestCase):
         self.assertEqual(canon, file_list)
 
 
-class TestSKSync(unittest.TestCase):
-
+class GenericSetup(unittest.TestCase):
     def setUp(self):
         # NOTE using Python unittest, setUp() is called before EACH and every
         self.server_dir = os.path.join('tmp_testsuitedir', 'server')
@@ -158,6 +157,9 @@ class TestSKSync(unittest.TestCase):
         safe_rmtree(self.client_dir)
         safe_mkdir(self.client_dir)
         self.config = {}
+
+
+class TestSKSync(GenericSetup):
 
     def test_sync_from_server_with_times_to_empty_client_directory(self):
         safe_rmtree(self.client_dir)
