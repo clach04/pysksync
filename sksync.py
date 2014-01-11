@@ -298,6 +298,9 @@ def get_file_listings(path_of_files, recursive=False, include_size=False, return
                 listings_result.append(file_details)
             else:
                 listings_result[filename] = file_details[1:]
+        elif os.path.isdir(filename):
+            # no need to process directories
+            pass
         else:
             # Probably Windows, with a (byte/str) filename containing
             # characters that are NOT in the current locale we can't
