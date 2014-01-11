@@ -968,6 +968,7 @@ def client_start_sync(ip, port, server_path, client_path, sync_type=SKSYNC_PROTO
 
 
 def run_client(config, config_name='client'):
+    logger.info('Using config_name %r', config_name)
     config = set_default_config(config)
     host, port = config['host'], config['port']
     if host == '0.0.0.0':
@@ -1029,7 +1030,8 @@ def main(argv=None):
     #print dump_json(config, indent=4)
 
     if 'client' in argv:
-        run_client(config)
+        config_name = argv[-1]
+        run_client(config, config_name=config_name)
     else:
         run_server(config)
     
