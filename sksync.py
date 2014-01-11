@@ -511,7 +511,7 @@ class MyTCPHandler(SocketServer.BaseRequestHandler):
             skip_count_str = ', skipped %d' % skip_count
         else:
             skip_count_str = ''
-        logger.info('Successfully checked %r, set sent %r%s files in %s', len(server_files), sent_count, skip_count_str, sync_timer)
+        logger.info('Successfully checked %r, sent %r%s files in %s', len(server_files), sent_count, skip_count_str, sync_timer)
         logger.info('Client %r disconnected' % (self.request.getpeername(),))
 
 
