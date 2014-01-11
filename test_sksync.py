@@ -78,6 +78,7 @@ def perform_sync(server_dir, client_dir, HOST='127.0.0.1', PORT=get_random_port(
     config = config or {}
     config['host'] = HOST
     config['port'] = PORT
+    config['require_auth'] = config.get('require_auth', False)
     #config['server_path'] = server_dir
     #config['client_path'] = client_dir
     config['testing'] = {}
