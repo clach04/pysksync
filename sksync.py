@@ -101,8 +101,14 @@ class NotAllowed(BaseSkSyncException):
 
 
 logging.basicConfig()
-logger = logging
 logger = logging.getLogger("sksync")
+"""
+logging_fmt_str = "%(process)d %(thread)d %(asctime)s - %(name)s %(filename)s:%(lineno)d - %(levelname)s - %(message)s"
+ch = logging.StreamHandler()  # use stdio
+formatter = logging.Formatter(logging_fmt_str)
+ch.setFormatter(formatter)
+logger.addHandler(ch)
+"""
 #logger.setLevel(logging.INFO)
 #logger.setLevel(logging.DEBUG)
 
