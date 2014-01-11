@@ -335,6 +335,28 @@ class TestSKSync(unittest.TestCase):
         check_file_contents_and_mtime(sub_test_dir, 'test2.txt')
         check_file_contents_and_mtime(sub_test_dir, 'test3.txt')
         # TODO check no other files exist in self.client_dir
+
+
+# TODO TestSKSyncWithInvalidAuth(TestSKSync):
+#        self.config['password'] = 'this is wrong'  # invalid password for below
+class TestSKSyncWithValidAuth(TestSKSync):
+    """Repeat tests above but with auth."""
+
+    def setUp(self):
+        TestSKSync.setUp(self)
+        self.config['require_auth'] = True
+        self.config['username'] = 'testuser'
+        self.config['password'] = 'testpassword'  # valid password for below
+        self.config['users'] = {
+            'testuser': {
+                'authsrp': [
+                    'cf78a7a5', 
+                    '7443843a24acb936bfb5d5e0d4184a3fd521d4edd8096cf2ac9cdc62eed1a363d9c4a1bd39cb69c8836eb6f77e757e73b77be766af8547eeab4d9b3be17e2860c81afde7d4d8b5b855635ccd22352e2538b27a30518c65e825f7bb29a7037e79aa144726af2dc24ccae76a8e7a2f97fede87aee5ecab1e1ee7e559ce85fc14767ef25314c121b9c093dcf980caab66c60ae7c426a885e04bcbd761b6289b582a6d194a145932180f9b55f58cb1d937659ded8c9eeb59490705c22263241ead65db01ac218a2b76c49947fdaf4f82c5de79c97f17da1101fc1daf14e7f49beb9b8c4496c4a585805a8b858f159ec2c8d423819f84530f496ee5303d2b2eb6a32b'
+                ]
+            }
+        }
+
+
 try:
     TestSKSync.assertTrue
 except AttributeError:
