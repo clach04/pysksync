@@ -489,11 +489,12 @@ class MyTCPHandler(SocketServer.BaseRequestHandler):
                         # Need to send binary/byte across wire
                         send_filename = send_filename.encode(filename_encoding)
 
-                    file_details = '%s\n%d\n%d\n' % (send_filename, mtime, data_len)
-                    logger.debug('file_details: %r', file_details)
                     f = open(filename, 'rb')
                     data = f.read()
                     f.close()
+                    assert data_len == len(data)
+                    file_details = '%s\n%d\n%d\n' % (send_filename, mtime, data_len)
+                    logger.debug('file_details: %r', file_details)
                     self.request.send(file_details)
                     self.request.send(data)
                     sent_count += 1
