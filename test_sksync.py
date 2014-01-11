@@ -80,7 +80,9 @@ def perform_sync(server_dir, client_dir, HOST='127.0.0.1', PORT=get_random_port(
     server = sksync.MyThreadedTCPServer((HOST, PORT), sksync.MyTCPHandler)
     try:
         host, port = server.server_address
-        
+        config = {"require_auth": False}
+        server.sksync_config = config
+
         # Start a thread with the server, in turn that thread will then start additional threads
         # One additional thread for each client request/connection
         server_thread = threading.Thread(target=server.serve_forever)
