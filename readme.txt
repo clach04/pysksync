@@ -42,6 +42,8 @@ If "server_dir_whitelist_policy" is not "silent" the server will terminate
 the client connection if "server_dir_whitelist" is set. This means that the
 server will not share all disks and directories.
 
+NOTE both the server "host" address and and "port" can be specified in
+the "client" section.
 
 sksync1_compat
 
@@ -78,6 +80,9 @@ If the client config sets "ssl_server_certfile", the server certificate will be
 checked and the connection will be encrypted. If "ssl_server_certfile" is not set
 client side, the connection will be encrypted but the certificate will not
 be checked.
+
+NOTE "ssl_server_certfile", "ssl_client_certfile", and "ssl_client_keyfile" can
+be specified in the "client" section.
 
 The server needs both the certificate and key file. Note if the key file is
 protected by a pass phrase the server process will prompt on the console!

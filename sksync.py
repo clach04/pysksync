@@ -795,13 +795,17 @@ def run_client(config, config_name='client'):
     sksync1_compat = config.get('sksync1_compat')
     client_config = config[config_name]
     server_path, client_path = client_config['server_path'], client_config['client_path']
+    host, port = client_config.get('host', host), client_config.get('port', port)
     recursive = client_config.get('recursive')
 
     use_ssl = config.get('use_ssl')
     ssl_server_certfile = config.get('ssl_server_certfile')
+    ssl_server_certfile = client_config.get('ssl_server_certfile', ssl_server_certfile)
 
     ssl_client_certfile = config.get('ssl_client_certfile')
     ssl_client_keyfile = config.get('ssl_client_keyfile')
+    ssl_client_keyfile = client_config.get('ssl_client_keyfile', ssl_client_keyfile)
+    ssl_client_certfile = client_config.get('ssl_client_certfile', ssl_client_keyfile)
     client_start_sync(host, port, server_path, client_path, recursive=recursive, use_ssl=use_ssl, ssl_server_certfile=ssl_server_certfile, ssl_client_certfile=ssl_client_certfile, ssl_client_keyfile=ssl_client_keyfile, sksync1_compat=sksync1_compat)
 
 
