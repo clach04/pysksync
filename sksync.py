@@ -356,9 +356,9 @@ class MyTCPHandler(SocketServer.BaseRequestHandler):
         logger.info('Client %r connected', (self.request.getpeername(),))
         config = getattr(self.server, 'sksync_config', {})
         config['server_dir_whitelist'] = config.get('server_dir_whitelist', [])
+        raise_errors = config.get('raise_errors', True)
         config['users'] = config.get('users', {})
         config['require_auth'] = config.get('require_auth', True)
-
 
         sync_timer = SimpleTimer()
         sync_timer.start()
@@ -388,6 +388,8 @@ class MyTCPHandler(SocketServer.BaseRequestHandler):
                                     ssl_version=SSL_VERSION)
                 logger.info('SSL connected using %r', self.request.cipher())
             except ssl.SSLError, info:
+                if raise_errors:
+                    raise
                 logger.error('Error starting SSL, check certificate and key are valid. %r', info)
                 # could be a bad client....
                 return
@@ -710,7 +712,7 @@ def run_server(config):
     server.serve_forever()
 
 
-def client_start_sync(ip, port, server_path, client_path, sync_type=SKSYNC_PROTOCOL_TYPE_FROM_SERVER_USE_TIME, recursive=False, use_ssl=None, ssl_server_certfile=None, ssl_client_certfile=None, ssl_client_keyfile=None, sksync1_compat=False, username=None, password=None):
+def client_start_sync(ip, port, server_path, client_path, sync_type=SKSYNC_PROTOCOL_TYPE_FROM_SERVER_USE_TIME, recursive=False, use_ssl=None, ssl_server_certfile=None, ssl_client_certfile=None, ssl_client_keyfile=None, sksync1_compat=False, raise_errors=True, username=None, password=None):
     """Implements SK Client, currently only supports:
        * direction =  "from server (use time)" ONLY
     """
@@ -792,6 +794,8 @@ def client_start_sync(ip, port, server_path, client_path, sync_type=SKSYNC_PROTO
             s.connect((ip, port))
             logger.info('SSL connected using %r', s.cipher())
         except ssl.SSLError, info:
+            if raise_errors:
+                raise
             logger.error('Error starting SSL connection, check SSL is enabled on server and certificate and key are valid. %r', info)
             return
     else:
