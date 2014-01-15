@@ -336,6 +336,65 @@ class TestSKSync(GenericSetup):
         check_file_contents_and_mtime(sub_test_dir, 'test2.txt')
         check_file_contents_and_mtime(sub_test_dir, 'test3.txt')
         # TODO check no other files exist in self.client_dir
+
+
+class TestSKSyncWithSSL(GenericSetup):
+
+    def setUp(self):
+        GenericSetup.setUp(self)
+        self.config['use_ssl'] = True
+        # BUT don't set SSL cert/key
+
+    # Cut down and modified version of TestSKSync.test_sync_from_server_with_times_to_empty_client_directory()
+    def test_sync_from_server_with_times_to_empty_client_directory(self):
+        # Expect SSL errors if SSL requested but no SSL cert/key specified
+        safe_rmtree(self.client_dir)
+        safe_mkdir(self.client_dir)
+        result = os.path.isdir(self.server_dir)
+
+        # clone of perform_sync(server_dir, client_dir, 
+        HOST = '127.0.0.1'
+        PORT = get_random_port()
+        config = self.config
+        server_dir, client_dir = self.server_dir, self.client_dir
+        recursive = True
+
+        config['host'] = HOST
+        config['port'] = PORT
+        #config['server_path'] = server_dir
+        #config['client_path'] = client_dir
+        config['testing'] = {}
+        config['testing']['server_path'] = server_dir
+        config['testing']['client_path'] = client_dir
+        config['testing']['recursive'] = recursive
+        config = sksync.set_default_config(config)
+        server_config = config.copy()
+        # TODO do NOT run server threaded, create thread for client. Then use assertRaises() for server
+        server_config['raise_errors'] = False
+
+        # Start sync server in thread
+        server = sksync.MyThreadedTCPServer((HOST, PORT), sksync.MyTCPHandler)
+        try:
+            host, port = server.server_address
+            server.sksync_config = server_config
+
+            # Start a thread with the server, in turn that thread will then start additional threads
+            # One additional thread for each client request/connection
+            server_thread = threading.Thread(target=server.serve_forever)
+            # Exit the server thread when the main thread terminates
+            server_thread.daemon = True
+            server_thread.start()
+            
+            def local_func_run_client():
+                # do sync
+                sksync.run_client(config, config_name='testing')
+            self.assertRaises(sksync.ssl.SSLError, local_func_run_client)
+        finally:
+            server.shutdown()
+
+        #local_func()
+        #self.assertRaises(sksync.ssl.SSLError, local_func)
+
 try:
     TestSKSync.assertTrue
 except AttributeError:
