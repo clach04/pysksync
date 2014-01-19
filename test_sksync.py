@@ -80,10 +80,11 @@ def perform_sync(server_dir, client_dir, HOST='127.0.0.1', PORT=get_random_port(
     config['port'] = PORT
     #config['server_path'] = server_dir
     #config['client_path'] = client_dir
-    config['testing'] = {}
-    config['testing']['server_path'] = server_dir
-    config['testing']['client_path'] = client_dir
-    config['testing']['recursive'] = recursive
+    config['clients'] = config.get('clients', {})
+    config['clients']['testing'] = {}
+    config['clients']['testing']['server_path'] = server_dir
+    config['clients']['testing']['client_path'] = client_dir
+    config['clients']['testing']['recursive'] = recursive
     config = sksync.set_default_config(config)
 
     # Start sync server in thread
@@ -363,10 +364,11 @@ class TestSKSyncWithSSL(GenericSetup):
         config['port'] = PORT
         #config['server_path'] = server_dir
         #config['client_path'] = client_dir
-        config['testing'] = {}
-        config['testing']['server_path'] = server_dir
-        config['testing']['client_path'] = client_dir
-        config['testing']['recursive'] = recursive
+        config['clients'] = config.get('clients', {})
+        config['clients']['testing'] = {}
+        config['clients']['testing']['server_path'] = server_dir
+        config['clients']['testing']['client_path'] = client_dir
+        config['clients']['testing']['recursive'] = recursive
         config = sksync.set_default_config(config)
         server_config = config.copy()
         # TODO do NOT run server threaded, create thread for client. Then use assertRaises() for server

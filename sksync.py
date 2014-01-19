@@ -809,7 +809,7 @@ def run_client(config, config_name='client'):
         host = 'localhost'
 
     sksync1_compat = config.get('sksync1_compat')
-    client_config = config[config_name]
+    client_config = config['clients'][config_name]
     server_path, client_path = client_config['server_path'], client_config['client_path']
     host, port = client_config.get('host', host), client_config.get('port', port)
     recursive = client_config.get('recursive')

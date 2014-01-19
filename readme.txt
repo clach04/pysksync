@@ -13,10 +13,12 @@ Sample sksync.json contents:
 
     {
         "sksync1_compat": true,
-        "client": {
-            "recursive": false,
-            "server_path": "/tmp/server/path",
-            "client_path": "/tmp/client/path"
+        "clients": {
+            "client": {
+                "recursive": false,
+                "server_path": "/tmp/server/path",
+                "client_path": "/tmp/client/path"
+            }
         }
     }
 
@@ -31,10 +33,12 @@ Sample config that limits the paths that clients can sync with:
         "port": 23456,
         "server_dir_whitelist": ["/tmp/override/path"],
         "server_dir_whitelist_policy": "silent",
-        "client": {
-            "recursive": true,
-            "server_path": "/tmp/server/path",
-            "client_path": "/tmp/client/path"
+        "clients": {
+            "client": {
+                "recursive": true,
+                "server_path": "/tmp/server/path",
+                "client_path": "/tmp/client/path"
+            }
         }
     }
 
