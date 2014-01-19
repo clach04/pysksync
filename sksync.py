@@ -67,6 +67,14 @@ else:
     dump_json = json.dumps
     load_json = json.loads
 
+try:
+    import easydialogs
+except ImportError:
+    try:
+        import EasyDialogs as easydialogs
+    except ImportError:
+        easydialogs = None
+
 
 PYSKSYNC_FILENAME_ENCODING = 'UTF-8'
 FILENAME_ENCODING = 'cp1252'  # latin1 encoding used by sksync 1
@@ -834,6 +842,48 @@ def set_default_config(config):
     return config
 
 
+def easydialogs_gui(config):
+    """Easydialogs does not support menus or list of items.
+    It does support YesNoCancel so this can be subverted to allow two options
+    and quit, (ab)use this to allow server or client to be started.
+    For client, allow picking out of only two client settings to be selected.
+    """
+    easydialogs_yes = 1
+    easydialogs_no = 0
+    easydialogs_cancel = -1
+
+    # NOTE GTK easydialogs.AskYesNoCancel() default param does NOT work
+    #result = easydialogs.AskYesNoCancel('sksync', default=-1, yes='Server', no='Client', cancel='Quit')
+    result = easydialogs.AskYesNoCancel('sksync', yes='Server', no='Client', cancel='Quit')
+
+    if result == easydialogs_yes:
+        run_server(config)
+    elif result == easydialogs_no:
+        # Show Client menu
+        client_names = list(config.get('clients', {}).keys())
+        print client_names
+        if 'client_1' not in client_names:
+            client_names.append('client_1')
+        if 'client_2' not in client_names:
+            client_names.append('client_2')
+        print client_names
+        # just pick first, don't pop()
+        client_1 = client_names[0]
+        client_2 = client_names[1]
+        # Hack for gtk easydialogs, which does NOT accept Unicode type strings but does accept utf-8 Unicode encoding byte strings
+        client_1 = client_1.encode('utf-8')
+        client_2 = client_2.encode('utf-8')
+
+        client_result = easydialogs_yes
+        while client_result != easydialogs_cancel:
+            client_result = easydialogs.AskYesNoCancel('Client', yes=client_1, no=client_2, cancel='Quit')
+            if client_result == easydialogs_yes:
+                config_name = client_1
+            elif client_result == easydialogs_no:
+                config_name = client_2
+            run_client(config, config_name=config_name)
+
+
 def main(argv=None):
     if argv is None:
         argv = sys.argv
@@ -855,7 +905,9 @@ def main(argv=None):
     # defaults
     config = set_default_config(config)
 
-    if 'client' in argv:
+    if 'gui' in argv:
+        easydialogs_gui(config)
+    elif 'client' in argv:
         config_name = argv[-1]
         run_client(config, config_name=config_name)
     else:
