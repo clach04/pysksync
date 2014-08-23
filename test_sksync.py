@@ -160,6 +160,11 @@ class GenericSetup(unittest.TestCase):
         safe_rmtree(self.client_dir)
         safe_mkdir(self.client_dir)
         self.config = {}
+        test_filenames = list(self.test_fixtures.keys())
+        test_filenames.sort()
+        for i in range(len(test_filenames)):
+            tmp_filename = 'TEST_FILENAME_%d' % (i + 1,)
+            setattr(self, tmp_filename, test_filenames[i])
 
     def check_file_contents_and_mtime(self, pathname, filename):
         check_file_contents_and_mtime(pathname, filename, self.test_fixtures)
@@ -176,33 +181,33 @@ class TestSKSync(GenericSetup):
         
         # for easy of reading - explictly document/check each file
         # rather than looping through fixtures
-        self.assertTrue(os.path.isfile(os.path.join(self.server_dir, 'test1.txt')))
-        self.assertTrue(os.path.isfile(os.path.join(self.server_dir, 'test2.txt')))
-        self.assertTrue(os.path.isfile(os.path.join(self.server_dir, 'test3.txt')))
+        self.assertTrue(os.path.isfile(os.path.join(self.server_dir, self.TEST_FILENAME_1)))
+        self.assertTrue(os.path.isfile(os.path.join(self.server_dir, self.TEST_FILENAME_2)))
+        self.assertTrue(os.path.isfile(os.path.join(self.server_dir, self.TEST_FILENAME_3)))
         
-        self.assertFalse(os.path.isfile(os.path.join(self.client_dir, 'test1.txt')))
-        self.assertFalse(os.path.isfile(os.path.join(self.client_dir, 'test2.txt')))
-        self.assertFalse(os.path.isfile(os.path.join(self.client_dir, 'test3.txt')))
+        self.assertFalse(os.path.isfile(os.path.join(self.client_dir, self.TEST_FILENAME_1)))
+        self.assertFalse(os.path.isfile(os.path.join(self.client_dir, self.TEST_FILENAME_2)))
+        self.assertFalse(os.path.isfile(os.path.join(self.client_dir, self.TEST_FILENAME_3)))
 
-        self.check_file_contents_and_mtime(self.server_dir, 'test1.txt')
-        self.check_file_contents_and_mtime(self.server_dir, 'test2.txt')
-        self.check_file_contents_and_mtime(self.server_dir, 'test3.txt')
+        self.check_file_contents_and_mtime(self.server_dir, self.TEST_FILENAME_1)
+        self.check_file_contents_and_mtime(self.server_dir, self.TEST_FILENAME_2)
+        self.check_file_contents_and_mtime(self.server_dir, self.TEST_FILENAME_3)
 
         # do sync
         perform_sync(self.server_dir, self.client_dir, config=self.config)
         
         # check files exist
-        self.assertTrue(os.path.isfile(os.path.join(self.client_dir, 'test1.txt')))
-        self.assertTrue(os.path.isfile(os.path.join(self.client_dir, 'test2.txt')))
-        self.assertTrue(os.path.isfile(os.path.join(self.client_dir, 'test3.txt')))
+        self.assertTrue(os.path.isfile(os.path.join(self.client_dir, self.TEST_FILENAME_1)))
+        self.assertTrue(os.path.isfile(os.path.join(self.client_dir, self.TEST_FILENAME_2)))
+        self.assertTrue(os.path.isfile(os.path.join(self.client_dir, self.TEST_FILENAME_3)))
         
         # No need to check if files compare with server versions as we compared server dir with fixture contents
         
         # check file contents
         # check mtimes
-        self.check_file_contents_and_mtime(self.client_dir, 'test1.txt')
-        self.check_file_contents_and_mtime(self.client_dir, 'test2.txt')
-        self.check_file_contents_and_mtime(self.client_dir, 'test3.txt')
+        self.check_file_contents_and_mtime(self.client_dir, self.TEST_FILENAME_1)
+        self.check_file_contents_and_mtime(self.client_dir, self.TEST_FILENAME_2)
+        self.check_file_contents_and_mtime(self.client_dir, self.TEST_FILENAME_3)
         # TODO check no other files exist in self.client_dir
 
     def test_sync_from_server_with_times_to_empty_client_directory_dynamic(self):
@@ -309,40 +314,40 @@ class TestSKSync(GenericSetup):
         
         # for easy of reading - explictly document/check each file
         # rather than looping through fixtures
-        self.assertTrue(os.path.isfile(os.path.join(self.server_dir, 'test1.txt')))
-        self.assertTrue(os.path.isfile(os.path.join(self.server_dir, 'test2.txt')))
-        self.assertTrue(os.path.isfile(os.path.join(self.server_dir, 'test3.txt')))
+        self.assertTrue(os.path.isfile(os.path.join(self.server_dir, self.TEST_FILENAME_1)))
+        self.assertTrue(os.path.isfile(os.path.join(self.server_dir, self.TEST_FILENAME_2)))
+        self.assertTrue(os.path.isfile(os.path.join(self.server_dir, self.TEST_FILENAME_3)))
         
-        self.assertFalse(os.path.isfile(os.path.join(self.client_dir, 'test1.txt')))
-        self.assertFalse(os.path.isfile(os.path.join(self.client_dir, 'test2.txt')))
-        self.assertFalse(os.path.isfile(os.path.join(self.client_dir, 'test3.txt')))
+        self.assertFalse(os.path.isfile(os.path.join(self.client_dir, self.TEST_FILENAME_1)))
+        self.assertFalse(os.path.isfile(os.path.join(self.client_dir, self.TEST_FILENAME_2)))
+        self.assertFalse(os.path.isfile(os.path.join(self.client_dir, self.TEST_FILENAME_3)))
 
-        self.check_file_contents_and_mtime(self.server_dir, 'test1.txt')
-        self.check_file_contents_and_mtime(self.server_dir, 'test2.txt')
-        self.check_file_contents_and_mtime(self.server_dir, 'test3.txt')
+        self.check_file_contents_and_mtime(self.server_dir, self.TEST_FILENAME_1)
+        self.check_file_contents_and_mtime(self.server_dir, self.TEST_FILENAME_2)
+        self.check_file_contents_and_mtime(self.server_dir, self.TEST_FILENAME_3)
 
         # do sync
         perform_sync(self.server_dir, self.client_dir, recursive=True)
         #x = raw_input('pausned')
         
         # check files exist
-        self.assertTrue(os.path.isfile(os.path.join(self.client_dir, 'test1.txt')))
-        self.assertTrue(os.path.isfile(os.path.join(self.client_dir, 'test2.txt')))
-        self.assertTrue(os.path.isfile(os.path.join(self.client_dir, 'test3.txt')))
-        self.assertTrue(os.path.isfile(os.path.join(sub_test_dir, 'test1.txt')))
-        self.assertTrue(os.path.isfile(os.path.join(sub_test_dir, 'test2.txt')))
-        self.assertTrue(os.path.isfile(os.path.join(sub_test_dir, 'test3.txt')))
+        self.assertTrue(os.path.isfile(os.path.join(self.client_dir, self.TEST_FILENAME_1)))
+        self.assertTrue(os.path.isfile(os.path.join(self.client_dir, self.TEST_FILENAME_2)))
+        self.assertTrue(os.path.isfile(os.path.join(self.client_dir, self.TEST_FILENAME_3)))
+        self.assertTrue(os.path.isfile(os.path.join(sub_test_dir, self.TEST_FILENAME_1)))
+        self.assertTrue(os.path.isfile(os.path.join(sub_test_dir, self.TEST_FILENAME_2)))
+        self.assertTrue(os.path.isfile(os.path.join(sub_test_dir, self.TEST_FILENAME_3)))
         
         # No need to check if files compare with server versions as we compared server dir with fixture contents
         
         # check file contents
         # check mtimes
-        self.check_file_contents_and_mtime(self.client_dir, 'test1.txt')
-        self.check_file_contents_and_mtime(self.client_dir, 'test2.txt')
-        self.check_file_contents_and_mtime(self.client_dir, 'test3.txt')
-        self.check_file_contents_and_mtime(sub_test_dir, 'test1.txt')
-        self.check_file_contents_and_mtime(sub_test_dir, 'test2.txt')
-        self.check_file_contents_and_mtime(sub_test_dir, 'test3.txt')
+        self.check_file_contents_and_mtime(self.client_dir, self.TEST_FILENAME_1)
+        self.check_file_contents_and_mtime(self.client_dir, self.TEST_FILENAME_2)
+        self.check_file_contents_and_mtime(self.client_dir, self.TEST_FILENAME_3)
+        self.check_file_contents_and_mtime(sub_test_dir, self.TEST_FILENAME_1)
+        self.check_file_contents_and_mtime(sub_test_dir, self.TEST_FILENAME_2)
+        self.check_file_contents_and_mtime(sub_test_dir, self.TEST_FILENAME_3)
         # TODO check no other files exist in self.client_dir
 
 
