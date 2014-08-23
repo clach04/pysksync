@@ -21,6 +21,12 @@ test_fixtures_us_ascii = {
     'test3.txt': (1345316082.71875 - 72, '3'),
 }
 
+test_fixtures_us_ascii_unicode_filenames = {
+    u'test1.txt': (1345316082.71875, '1'),
+    u'test2.txt': (1345316082.71875 - 12, '2'),
+    u'test3.txt': (1345316082.71875 - 72, '3'),
+}
+
 
 def safe_rmtree(testdir):
     if '*' in testdir:
@@ -349,6 +355,13 @@ class TestSKSync(GenericSetup):
         self.check_file_contents_and_mtime(sub_test_dir, self.TEST_FILENAME_2)
         self.check_file_contents_and_mtime(sub_test_dir, self.TEST_FILENAME_3)
         # TODO check no other files exist in self.client_dir
+
+
+class TestSKSyncUnicodeType7bitFilenames(TestSKSync):
+    # Uses 7 bit ascii filenames, but we use unicode in the fixture
+    # mostly a no-op test
+    def setUp(self, test_fixtures=test_fixtures_us_ascii_unicode_filenames):
+        GenericSetup.setUp(self, test_fixtures)
 
 
 class TestSKSyncWithSSL(GenericSetup):
