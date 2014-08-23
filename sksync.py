@@ -120,6 +120,17 @@ logger.addHandler(ch)
 #logger.setLevel(logging.INFO)
 #logger.setLevel(logging.DEBUG)
 
+IGNORE_SET_TIME_ERRORS = False
+
+def set_utime(a, b):
+    try:
+        os.utime(a, b)
+    except OSError, info:
+        if IGNORE_SET_TIME_ERRORS:
+            # probably Android https://groups.google.com/forum/#!msg/python-for-android/MlOLiTOeK0o/_5m2jtvXsNIJ
+            pass
+        else:
+            raise
 
 def safe_mkdir(newdir):
     result_dir = os.path.abspath(newdir)
@@ -792,7 +803,7 @@ def client_start_sync(ip, port, server_path, client_path, sync_type=SKSYNC_PROTO
         f = open(full_filename, 'wb')
         f.write(filecontents)
         f.close()
-        os.utime(full_filename, (mtime, mtime))
+        set_utime(full_filename, (mtime, mtime))
         received_file_count += 1
         byte_count_recv += len(filecontents)
 
@@ -838,6 +849,8 @@ def set_default_config(config):
     config['host'] = config.get('host', '0.0.0.0')
     config['port'] = config.get('port', SKSYNC_DEFAULT_PORT)
     config['sksync1_compat'] = config.get('sksync1_compat', False)
+    config['ignore_time_errors'] = config.get('ignore_time_errors', False)
+    IGNORE_SET_TIME_ERRORS = config['ignore_time_errors']  # update the global
     config['use_ssl'] = config.get('use_ssl', False)
     return config
 

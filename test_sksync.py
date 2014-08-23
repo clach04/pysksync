@@ -16,6 +16,8 @@ import sksync
 safe_mkdir = sksync.safe_mkdir
 
 
+SKIP_TIME_TIME_CHECK = False
+
 # NOTE currently tests are hard coded for 3 files
 # fixtures need to contain 3 until test is more dynamic
 test_fixtures_us_ascii = {
@@ -70,7 +72,8 @@ def check_file_contents_and_mtime(pathname, filename, test_fixtures):
     data = f.read()
     f.close()
     assert canon_data == data  # , ' %r != %r' % (canon_data, data)
-    assert abs(canon_mtime - x.st_mtime) <= 1, 'canon_mtime mismatch x.st_mtime: %r' % ((canon_mtime, x.st_mtime),)  # with in 1 second
+    if not SKIP_TIME_TIME_CHECK:
+        assert abs(canon_mtime - x.st_mtime) <= 1, 'canon_mtime mismatch x.st_mtime: %r' % ((canon_mtime, x.st_mtime),)  # with in 1 second
 
 
 def create_test_files(test_fixtures, testdir='tmp_testsuitedir', data_override=None):
@@ -88,7 +91,7 @@ def create_test_files(test_fixtures, testdir='tmp_testsuitedir', data_override=N
         f = open(filename, 'wb')
         f.write(data)
         f.close()
-        os.utime(filename, (mtime, mtime))
+        sksync.set_utime(filename, (mtime, mtime))
 
 
 def perform_sync(server_dir, client_dir, HOST='127.0.0.1', PORT=get_random_port(), recursive=False, config=None):
