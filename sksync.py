@@ -79,7 +79,9 @@ except ImportError:
 PYSKSYNC_FILENAME_ENCODING = 'UTF-8'
 FILENAME_ENCODING = 'cp1252'  # latin1 encoding used by sksync 1
 language_name, SYSTEM_ENCODING = locale.getdefaultlocale()
-#print language_name, SYSTEM_ENCODING
+# SYSTEM_ENCODING is usually set. If not, default to UTF-8
+# (a good default for Unix, Android, Mac.)
+SYSTEM_ENCODING = SYSTEM_ENCODING or 'UTF-8'  # TODO could allow config setting override
 
 SKSYNC_DEFAULT_PORT = 23456
 #SKSYNC_DEFAULT_PORT = 23456 + 1  # FIXME DEBUG not default!!
@@ -664,6 +666,8 @@ def client_start_sync(ip, port, server_path, client_path, sync_type=SKSYNC_PROTO
 
     logger.info('server_path %r', server_path)
     logger.info('client_path %r', client_path)
+    # Make filenames/paths Unicode
+    client_path = client_path.encode(SYSTEM_ENCODING)
     real_client_path = os.path.abspath(client_path)
     file_list_str = ''
 
@@ -798,6 +802,10 @@ def client_start_sync(ip, port, server_path, client_path, sync_type=SKSYNC_PROTO
         
         full_filename = os.path.join(real_client_path, filename)
         full_filename_dir = os.path.dirname(full_filename)
+        # Not all platforms support Unicode file names (e.g. Python android)
+        full_filename = full_filename.encode(SYSTEM_ENCODING)
+        full_filename_dir = full_filename_dir.encode(SYSTEM_ENCODING)
+
         #if not exists full_filename_dir
         safe_mkdir(full_filename_dir)
         f = open(full_filename, 'wb')
