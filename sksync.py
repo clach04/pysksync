@@ -637,11 +637,6 @@ def client_start_sync(ip, port, server_path, client_path, sync_type=SKSYNC_PROTO
     """Implements SK Client, currently only supports:
        * direction =  "from server (use time)" ONLY
     """
-    logger.info('server_path %r', server_path)
-    logger.info('client_path %r', client_path)
-    real_client_path = os.path.abspath(client_path)
-    file_list_str = ''
-
     if sksync1_compat and use_ssl:
         logger.error('Compatibility with SK Sync 1 and SSL support are incompatible options.')
         raise NotAllowed('SK sync v1 support and SSL support at the same time.')
@@ -656,8 +651,13 @@ def client_start_sync(ip, port, server_path, client_path, sync_type=SKSYNC_PROTO
         filename_encoding = PYSKSYNC_FILENAME_ENCODING
         sync_protocol = PYSKSYNC_PROTOCOL_01
 
+    logger.info('server_path %r', server_path)
+    logger.info('client_path %r', client_path)
+    real_client_path = os.path.abspath(client_path)
+    file_list_str = ''
+
     logger.info('filename_encoding %r', filename_encoding)
-    logger.info('determining client files')
+    logger.info('determining client files for %r', real_client_path)
     file_list = get_file_listings(real_client_path, recursive=recursive)
     file_list_info = []
     for filename, mtime in file_list:
