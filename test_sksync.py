@@ -407,4 +407,5 @@ except AttributeError:
 if __name__ == '__main__':
     #sksync.logger.setLevel(sksync.logging.INFO)  # Debug
     #sksync.logger.setLevel(sksync.logging.DEBUG)  # Debug
+    sksync.logging.disable(sksync.logging.ERROR)  # ugh!
     unittest.main()
