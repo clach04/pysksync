@@ -15,6 +15,9 @@ import unittest
 import sksync
 safe_mkdir = sksync.safe_mkdir
 
+
+# NOTE currently tests are hard coded for 3 files
+# fixtures need to contain 3 until test is more dynamic
 test_fixtures_us_ascii = {
     'test1.txt': (1345316082.71875, '1'),
     'test2.txt': (1345316082.71875 - 12, '2'),
@@ -25,6 +28,14 @@ test_fixtures_us_ascii_unicode_filenames = {
     u'test1.txt': (1345316082.71875, '1'),
     u'test2.txt': (1345316082.71875 - 12, '2'),
     u'test3.txt': (1345316082.71875 - 72, '3'),
+}
+
+# latin1 (i.e. Western European (iso-8559-1, iso-8559-15, and cp1252)
+test_fixtures_latin1 = {
+    ##u'test\u00DC.txt': (1345316082.71875, '1'),  # uppercase U-umlaut / U-diaeresis # NOTE case sensitive test
+    u'test\u00FC.txt': (1345316082.71875 - 12, '2'),  # lowercase U-umlaut / U-diaeresis
+    u'testB.txt': (1345316082.71875 - 72, '3'),
+    u'testC.txt': (1345316082.71875 - 72, '4'),
 }
 
 
@@ -58,7 +69,7 @@ def check_file_contents_and_mtime(pathname, filename, test_fixtures):
     f = open(filename)
     data = f.read()
     f.close()
-    assert canon_data == data
+    assert canon_data == data  # , ' %r != %r' % (canon_data, data)
     assert abs(canon_mtime - x.st_mtime) <= 1, 'canon_mtime mismatch x.st_mtime: %r' % ((canon_mtime, x.st_mtime),)  # with in 1 second
 
 
@@ -361,6 +372,11 @@ class TestSKSyncUnicodeType7bitFilenames(TestSKSync):
     # Uses 7 bit ascii filenames, but we use unicode in the fixture
     # mostly a no-op test
     def setUp(self, test_fixtures=test_fixtures_us_ascii_unicode_filenames):
+        GenericSetup.setUp(self, test_fixtures)
+
+
+class TestSKSyncLatin1Files(TestSKSync):
+    def setUp(self, test_fixtures=test_fixtures_latin1):
         GenericSetup.setUp(self, test_fixtures)
 
 
