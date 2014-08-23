@@ -1,3 +1,11 @@
+pysksync - a Pure Python implementation of the SK Sync protocol
+
+The can be used with the existing Android SK Sync client and
+Java SK Sync server.
+
+For more information see the wiki at
+https://bitbucket.org/clach04/pysksync/wiki/Home
+
 
 Usage
 
