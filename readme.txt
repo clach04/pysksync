@@ -41,6 +41,7 @@ Sample config that limits the paths that clients can sync with:
         "port": 23456,
         "server_dir_whitelist": ["/tmp/override/path"],
         "server_dir_whitelist_policy": "silent",
+        "ignore_time_errors": false,
         "clients": {
             "client": {
                 "recursive": true,
@@ -53,6 +54,10 @@ Sample config that limits the paths that clients can sync with:
 If "server_dir_whitelist_policy" is not "silent" the server will terminate
 the client connection if "server_dir_whitelist" is set. This means that the
 server will not share all disks and directories.
+
+If "ignore_time_errors" is true, errors relating to setting files
+modification times will be ignored. This is useful on a number
+of Android devices.
 
 NOTE both the server "host" address and and "port" can be specified in
 the "client" section.
