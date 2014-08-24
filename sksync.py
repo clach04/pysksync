@@ -858,7 +858,8 @@ def set_default_config(config):
     config['port'] = config.get('port', SKSYNC_DEFAULT_PORT)
     config['sksync1_compat'] = config.get('sksync1_compat', False)
     config['ignore_time_errors'] = config.get('ignore_time_errors', False)
-    IGNORE_SET_TIME_ERRORS = config['ignore_time_errors']  # update the global
+    global IGNORE_SET_TIME_ERRORS
+    IGNORE_SET_TIME_ERRORS = config['ignore_time_errors']
     config['use_ssl'] = config.get('use_ssl', False)
     return config
 
