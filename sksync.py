@@ -709,8 +709,8 @@ def run_server(config):
 
     config = set_default_config(config)
     if config.get('sksync1_compat') and (config.get('use_ssl') or config.get('require_auth', True)):
-        logger.error('Compatibility with SK Sync 1 and use_ssl/require_auth are incompatible options.')
-        raise NotAllowed('SK sync v1 support and use_ssl/require_auth at the same time.')
+        logger.error('Support for SK Sync v1 is incompatible with use_ssl/require_auth options.')
+        raise NotAllowed('Support for SK Sync v1 is incompatible with use_ssl/require_auth options.')
 
     host, port = config['host'], config['port']
 
@@ -738,8 +738,8 @@ def client_start_sync(ip, port, server_path, client_path, sync_type=SKSYNC_PROTO
     password = password or ''
 
     if sksync1_compat and (use_ssl or (username or password)):
-        logger.error('Compatibility with SK Sync 1 and SSL/SRP are incompatible options.')
-        raise NotAllowed('SK sync v1 support and SSL/SRP at the same time.')
+        logger.error('Support for SK Sync v1 is incompatible with SSL/SRP options.')
+        raise NotAllowed('Support for SK Sync v1 is incompatible with SSL/SRP options.')
 
     sync_timer = SimpleTimer()
     sync_timer.start()
