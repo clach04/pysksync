@@ -18,6 +18,7 @@ import glob
 import errno
 import binascii
 import locale
+import zlib
 
 try:
     #raise ImportError ## Debug, pretend we are 2.3 and earlier
@@ -618,7 +619,20 @@ class MyTCPHandler(SocketServer.BaseRequestHandler):
                     data = f.read()
                     f.close()
                     assert data_len == len(data)
-                    file_details = '%s\n%d\n%d\n' % (send_filename, mtime, data_len)
+                    compression_type = 'gz'
+                    #compression_type = None
+                    # TODO compress black list (e.g. don't attempt to compress; .zip, .png, .jpg, .mp3, ....
+                    if compression_type:
+                        # TODO handle different compression types...
+                        data = zlib.compress(data)  # TODO compression level
+                        data_len = len(data)
+                        # TODO if compressed length is longer use original...
+
+                    if compression_type:
+                        data_len_str = '%s %d' % (compression_type, data_len,)
+                    else:
+                        data_len_str = '%d' % (data_len,)
+                    file_details = '%s\n%d\n%s\n' % (send_filename, mtime, data_len_str)
                     logger.debug('file_details: %r', file_details)
                     self.request.send(file_details)
                     self.request.send(data)
@@ -981,6 +995,11 @@ def client_start_sync(ip, port, server_path, client_path, sync_type=SKSYNC_PROTO
         logger.debug('mtime: %r', mtime)
         filesize = reader.next()
         logger.debug('filesize: %r', filesize)
+        filesize_split = filesize.split()
+        if len(filesize_split) == 2:
+            compression_type, filesize = filesize_split
+        else:
+            compression_type = None
         filesize = int(filesize)
         logger.debug('filesize: %r', filesize)
         logger.info('processing %r', ((filename, filesize, mtime),))  # TODO add option to supress this?
@@ -988,7 +1007,10 @@ def client_start_sync(ip, port, server_path, client_path, sync_type=SKSYNC_PROTO
         # now read filesize bytes....
         filecontents = reader.recv(filesize)
         logger.debug('filecontents: %r', filecontents)
-        
+        if compression_type:
+            # TODO handle different compression types...
+            filecontents = zlib.decompress(filecontents)
+
         full_filename = os.path.join(real_client_path, filename)
         full_filename_dir = os.path.dirname(full_filename)
         # Not all platforms support Unicode file names (e.g. Python android)
