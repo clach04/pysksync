@@ -448,13 +448,18 @@ class MyTCPHandler(SocketServer.BaseRequestHandler):
             M = binascii.unhexlify(response.strip())
             HAMK = svr.verify_session(M)
             if HAMK is None:
-                raise PAKEFailure()
+                # PAKEFailure, send client empty string so client knows there was a PAKEFailure
+                HAMK = ''
             message = '%s\n' % (binascii.hexlify(HAMK),)
             logger.debug('sending: len %d %r' % (len(message), message, ))
             len_sent = self.request.send(message)
             logger.debug('sent: len %d' % (len_sent, ))
             if not svr.authenticated():
-                raise PAKEFailure()
+                logger.error('SRP PAKEFailure server side, client auth does not match server.')
+                if raise_errors:
+                    raise PAKEFailure()
+                else:
+                    return
             # svr.K is now a shared key available to use
 
             # Resume SKSYNC PROTOCOL
@@ -893,8 +898,7 @@ def client_start_sync(ip, port, server_path, client_path, sync_type=SKSYNC_PROTO
         response = reader.next()
         logger.debug('Received: %r' % response)
         HAMK = binascii.unhexlify(response.strip())
-        if HAMK is None:
-            raise PAKEFailure()
+        # if HAMK == '', we have a failure, this will be detected in verify_session()
 
         usr.verify_session(HAMK)
         if not usr.authenticated():

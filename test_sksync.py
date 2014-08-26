@@ -420,6 +420,7 @@ class TestSKSyncWithInvalidAuth(GenericSetup):
 
     def setUp(self):
         GenericSetup.setUp(self)
+        self.config['raise_errors'] = False  # Do not raise PAKEFailure on server, see SSL note below
         self.config['require_auth'] = True
         self.config['username'] = 'testuser'
         self.config['password'] = 'this is wrong'  # invalid password for below
@@ -433,16 +434,17 @@ class TestSKSyncWithInvalidAuth(GenericSetup):
         }
 
     # Cut down and modified version of TestSKSync.test_sync_from_server_with_times_to_empty_client_directory()
+    # TODO once TestSKSyncWithSSL() checks server SSL error, apply same approach here
     def test_sync_from_server_with_times_to_empty_client_directory(self):
         safe_rmtree(self.client_dir)
         safe_mkdir(self.client_dir)
         result = os.path.isdir(self.server_dir)
 
         # do sync
-        perform_sync(self.server_dir, self.client_dir, config=self.config)
+        def doit():
+            perform_sync(self.server_dir, self.client_dir, config=self.config)
+        self.assertRaises(sksync.PAKEFailure, doit)
         # Both a server and client failure is expected
-        # However how they should be reported is not yet specified in the protocol
-        # TODO check for failure once failure reporting mechanism is specified
 
 
 try:
