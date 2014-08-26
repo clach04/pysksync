@@ -78,7 +78,7 @@ except ImportError:
 
 
 def fake_module(name):
-    # Fail with a clear message (possibly at an unexpected time)
+    # Fail with a clear message (possibly at an unexpected time in the future)
     class MissingModule(object):
         def __getattr__(self, attr):
             raise ImportError('No module named %s' % name)
