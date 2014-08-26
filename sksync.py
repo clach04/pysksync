@@ -89,7 +89,7 @@ def fake_module(name):
     return MissingModule()
 
 try:
-    import srp
+    import srp  # from https://pypi.python.org/pypi/srp
 except ImportError:
     srp = fake_module('srp')
 
