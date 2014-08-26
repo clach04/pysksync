@@ -43,7 +43,10 @@ Sample config that limits the paths that clients can sync with:
         "require_auth": false,
     }
 
-NOTE the require_auth entry for backwards compatibility with SK Sync.
+NOTE the require_auth entry for backwards compatibility with SK Sync,
+this is not needed if sksync1_compat is set to true but can be used
+to disable SRP support, e.g. when using SSL and the server is
+validating client certificate.
 
 If "server_dir_whitelist_policy" is not "silent" the server will terminate
 the client connection if "server_dir_whitelist" is set. This means that the
