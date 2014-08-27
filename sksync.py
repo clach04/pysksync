@@ -376,10 +376,8 @@ class MyTCPHandler(SocketServer.BaseRequestHandler):
     def handle(self):
         logger.info('Client %r connected', (self.request.getpeername(),))
         config = getattr(self.server, 'sksync_config', {})
-        config['server_dir_whitelist'] = config.get('server_dir_whitelist', [])
-        raise_errors = config.get('raise_errors', True)
-        config['users'] = config.get('users', {})
-        config['require_auth'] = config.get('require_auth', True)
+        config = set_default_config(config)
+        raise_errors = config['raise_errors']
 
         sync_timer = SimpleTimer()
         sync_timer.start()
@@ -526,7 +524,7 @@ class MyTCPHandler(SocketServer.BaseRequestHandler):
                 tmp_path = os.path.abspath(tmp_path)
                 server_dir_whitelist.append(tmp_path)
             if server_path not in server_dir_whitelist:
-                if config.get('server_dir_whitelist_policy', "deny") == 'silent':
+                if config['server_dir_whitelist_policy'] == 'silent':
                     # silently ignore client's path request, use first white listed dir
                     server_path = server_dir_whitelist[0]
                     logger.info('OVERRIDE server_path: %r', server_path)
@@ -727,7 +725,7 @@ def run_server(config):
     """
 
     config = set_default_config(config)
-    if config.get('sksync1_compat') and (config.get('use_ssl') or config.get('require_auth', True)):
+    if config['sksync1_compat'] and (config['use_ssl'] or config['require_auth']):
         logger.error('Support for SK Sync v1 is incompatible with use_ssl/require_auth options.')
         raise NotAllowed('Support for SK Sync v1 is incompatible with use_ssl/require_auth options.')
 
@@ -1035,7 +1033,7 @@ def run_client(config, config_name='client'):
     if host == '0.0.0.0':
         host = 'localhost'
 
-    sksync1_compat = config.get('sksync1_compat')
+    sksync1_compat = config['sksync1_compat']
     client_config = config['clients'][config_name]
     server_path, client_path = client_config['server_path'], client_config['client_path']
     host, port = client_config.get('host', host), client_config.get('port', port)
@@ -1043,7 +1041,7 @@ def run_client(config, config_name='client'):
 
     username, password = config.get('username'), config.get('password')
 
-    use_ssl = config.get('use_ssl')
+    use_ssl = config['use_ssl']
     ssl_server_certfile = config.get('ssl_server_certfile')
     ssl_server_certfile = client_config.get('ssl_server_certfile', ssl_server_certfile)
 
@@ -1067,6 +1065,10 @@ def set_default_config(config):
         config['require_auth'] = config.get('require_auth', False)
     else:
         config['require_auth'] = config.get('require_auth', True)
+    config['server_dir_whitelist'] = config.get('server_dir_whitelist', [])
+    config['server_dir_whitelist_policy'] = config.get('server_dir_whitelist_policy', 'deny')
+    config['users'] = config.get('users', {})
+    config['raise_errors'] = config.get('raise_errors', True)
     return config
 
 
