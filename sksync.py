@@ -19,6 +19,7 @@ import errno
 import binascii
 import locale
 import zlib
+import bz2
 
 try:
     #raise ImportError ## Debug, pretend we are 2.3 and earlier
@@ -126,6 +127,17 @@ if ssl:
 # PYSKSYNC specific constants
 PYSKSYNC_CR_START = 'PYSKSYNC SRP START:'  # Challenge Response start message
 
+# Compression lookup, could add alternatives like snappy, lz*, etc.
+compression_lookup = {
+    'gz': {
+        'compress': zlib.compress,
+        'decompress': zlib.decompress,
+    },
+    'bz2': {
+        'compress': bz2.compress,
+        'decompress': bz2.decompress,
+    },
+}
 
 class BaseSkSyncException(Exception):
     '''Base SK Sync exception'''
@@ -625,12 +637,16 @@ class MyTCPHandler(SocketServer.BaseRequestHandler):
                     data = f.read()
                     f.close()
                     assert data_len == len(data)
+
                     compression_type = 'gz'
+                    #compression_type = 'bz2'
                     #compression_type = None
                     # TODO compress black list (e.g. don't attempt to compress; .zip, .png, .jpg, .mp3, ....
                     if compression_type:
-                        # TODO handle different compression types...
-                        data = zlib.compress(data)  # TODO compression level
+                        compression_func = compression_lookup[compression_type]['compress']
+                        # TODO compression_type.split('-') to determine parameters, e.g. compression level
+                        # one shot (in memory, like file IO) compress
+                        data = compression_func(data)  # TODO compression level/parameters
                         data_len = len(data)
                         # TODO if compressed length is longer use original...
 
@@ -1019,8 +1035,9 @@ def client_start_sync(ip, port, server_path, client_path, sync_type=SKSYNC_PROTO
         filecontents = reader.recv(filesize)
         logger.debug('filecontents: %r', filecontents)
         if compression_type:
-            # TODO handle different compression types...
-            filecontents = zlib.decompress(filecontents)
+            decompression_func = compression_lookup[compression_type]['decompress']
+            # one shot (in memory, like file IO) decompress
+            filecontents = decompression_func(filecontents)
 
         full_filename = os.path.join(real_client_path, filename)
         full_filename_dir = os.path.dirname(full_filename)
