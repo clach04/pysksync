@@ -378,6 +378,14 @@ class TestSKSyncUnicodeType7bitFilenames(TestSKSync):
     def setUp(self, test_fixtures=test_fixtures_us_ascii_unicode_filenames):
         GenericSetup.setUp(self, test_fixtures)
 
+"""
+class TestSKSyncWhitelistFail(TestSKSync):
+    def setUp(self, test_fixtures=test_fixtures_us_ascii_unicode_filenames):
+        GenericSetup.setUp(self, test_fixtures)
+        self.config['server_dir_whitelist'] = ['/must/not/exist/for/this/test']
+        # TODO run all tests with assertRaises NotAllowed for server
+"""
+
 
 class TestSKSyncLatin1Files(TestSKSync):
     def setUp(self, test_fixtures=test_fixtures_latin1):
