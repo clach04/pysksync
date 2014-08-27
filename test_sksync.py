@@ -448,8 +448,8 @@ class TestSKSyncWithValidAuth(TestSKSync):
     def setUp(self):
         TestSKSync.setUp(self)
         self.config['require_auth'] = True
-        self.config['username'] = 'testuser'
-        self.config['password'] = 'testpassword'  # valid password for below
+        self.config['username'] = 'testuser'  # valid username for below
+        self.config['password'] = 'testpassword'  # valid password for testuser below
         self.config['users'] = {
             'testuser': {
                 'authsrp': [
@@ -460,7 +460,7 @@ class TestSKSyncWithValidAuth(TestSKSync):
         }
 
 
-class TestSKSyncWithInvalidAuth(GenericSetup):
+class TestSKSyncWithInvalidAuthPassword(GenericSetup):
 
     def setUp(self):
         GenericSetup.setUp(self)
@@ -468,6 +468,37 @@ class TestSKSyncWithInvalidAuth(GenericSetup):
         self.config['require_auth'] = True
         self.config['username'] = 'testuser'  # valid username
         self.config['password'] = 'this is wrong'  # invalid password for below
+        self.config['users'] = {
+            'testuser': {
+                'authsrp': [
+                    'cf78a7a5', 
+                    '7443843a24acb936bfb5d5e0d4184a3fd521d4edd8096cf2ac9cdc62eed1a363d9c4a1bd39cb69c8836eb6f77e757e73b77be766af8547eeab4d9b3be17e2860c81afde7d4d8b5b855635ccd22352e2538b27a30518c65e825f7bb29a7037e79aa144726af2dc24ccae76a8e7a2f97fede87aee5ecab1e1ee7e559ce85fc14767ef25314c121b9c093dcf980caab66c60ae7c426a885e04bcbd761b6289b582a6d194a145932180f9b55f58cb1d937659ded8c9eeb59490705c22263241ead65db01ac218a2b76c49947fdaf4f82c5de79c97f17da1101fc1daf14e7f49beb9b8c4496c4a585805a8b858f159ec2c8d423819f84530f496ee5303d2b2eb6a32b'
+                ]
+            }
+        }
+
+    # Cut down and modified version of TestSKSync.test_sync_from_server_with_times_to_empty_client_directory()
+    # TODO once TestSKSyncWithSSL() checks server SSL error, apply same approach here
+    def test_sync_from_server_with_times_to_empty_client_directory(self):
+        safe_rmtree(self.client_dir)
+        safe_mkdir(self.client_dir)
+        result = os.path.isdir(self.server_dir)
+
+        # do sync
+        def doit():
+            perform_sync(self.server_dir, self.client_dir, config=self.config)
+        self.assertRaises(sksync.PAKEFailure, doit)
+        # Both a server and client failure is expected
+
+
+class TestSKSyncWithInvalidAuthMissingUser(GenericSetup):
+
+    def setUp(self):
+        GenericSetup.setUp(self)
+        self.config['raise_errors'] = False  # Do not raise PAKEFailure on server, see SSL note below
+        self.config['require_auth'] = True
+        self.config['username'] = 'missing_user'  # user that does NOT exist below
+        self.config['password'] = 'testpassword'  # valid password for testuser below
         self.config['users'] = {
             'testuser': {
                 'authsrp': [

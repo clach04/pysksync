@@ -907,7 +907,12 @@ def client_start_sync(ip, port, server_path, client_path, sync_type=SKSYNC_PROTO
 
         response = reader.next()
         logger.debug('Received: %r' % response)
-        s_hex, B_hex = response.split()
+        try:
+            s_hex, B_hex = response.split()
+        except ValueError:
+            # split failed, probably got sent back an empty string which is
+            # what the server does when it hits a PAKEFailure
+            raise PAKEFailure()
         _s, B = binascii.unhexlify(s_hex), binascii.unhexlify(B_hex)
 
         if s is None or B is None:
