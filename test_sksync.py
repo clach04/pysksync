@@ -466,7 +466,7 @@ class TestSKSyncWithInvalidAuth(GenericSetup):
         GenericSetup.setUp(self)
         self.config['raise_errors'] = False  # Do not raise PAKEFailure on server, see SSL note below
         self.config['require_auth'] = True
-        self.config['username'] = 'testuser'
+        self.config['username'] = 'testuser'  # valid username
         self.config['password'] = 'this is wrong'  # invalid password for below
         self.config['users'] = {
             'testuser': {

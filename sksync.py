@@ -420,64 +420,70 @@ class MyTCPHandler(SocketServer.BaseRequestHandler):
 
         # Start of PYSKSYNC challenge/response
         if config['require_auth'] or response.startswith(PYSKSYNC_CR_START):
-            if not response.startswith(PYSKSYNC_CR_START):
-                # client is not starting PAKE session
-                raise PAKEFailure()
-
-            # SRP 6a
-            # As per spec, errors result in an abort, PAKEFailure is raised.
-            # Nothing helpful is sent to the peer.
-            logger.info('authenticated connection requested')
             try:
-                I_hex, A_hex = response[len(PYSKSYNC_CR_START):].split()
-            except ValueError:
-                # bad user/verifier
-                raise PAKEFailure()
-            I, A = binascii.unhexlify(I_hex), binascii.unhexlify(A_hex)
-            logger.info('attempting authentication for user %s' % I)
-
-            #salt, vkey = config['users'][I]['authsrp']
-            authsrp = config['users'].get(I, {}).get('authsrp')
-            if not authsrp:
-                # User does not exist
-                raise PAKEFailure()
-            try:
-                salt, vkey = authsrp
-            except ValueError:
-                # bad user/verifier entry
-                raise PAKEFailure()
-            salt, vkey = binascii.unhexlify(salt), binascii.unhexlify(vkey)
-            svr = srp.Verifier(I, salt, vkey, A)
-            s, B = svr.get_challenge()
-            if s is None or B is None:
-                raise PAKEFailure()
-            message = '%s %s\n' % (binascii.hexlify(s), binascii.hexlify(B))
-            logger.debug('sending: len %d %r' % (len(message), message, ))
-            len_sent = self.request.send(message)
-            logger.debug('sent: len %d' % (len_sent, ))
-
-            response = reader.next()
-            logger.debug('Received: %r' % response)
-            M = binascii.unhexlify(response.strip())
-            HAMK = svr.verify_session(M)
-            if HAMK is None:
-                # PAKEFailure, send client empty string so client knows there was a PAKEFailure
-                HAMK = ''
-            message = '%s\n' % (binascii.hexlify(HAMK),)
-            logger.debug('sending: len %d %r' % (len(message), message, ))
-            len_sent = self.request.send(message)
-            logger.debug('sent: len %d' % (len_sent, ))
-            if not svr.authenticated():
-                logger.error('SRP PAKEFailure server side, client auth does not match server.')
-                if raise_errors:
+                if not response.startswith(PYSKSYNC_CR_START):
+                    # client is not starting PAKE session
                     raise PAKEFailure()
+
+                # SRP 6a
+                # As per spec, errors result in an abort, PAKEFailure is raised.
+                # Nothing helpful is sent to the peer.
+                logger.info('authenticated connection requested')
+                try:
+                    I_hex, A_hex = response[len(PYSKSYNC_CR_START):].split()
+                except ValueError:
+                    # bad user/verifier
+                    raise PAKEFailure()
+                I, A = binascii.unhexlify(I_hex), binascii.unhexlify(A_hex)
+                logger.info('attempting authentication for user %s' % I)
+
+                #salt, vkey = config['users'][I]['authsrp']
+                authsrp = config['users'].get(I, {}).get('authsrp')
+                if not authsrp:
+                    # User does not exist
+                    raise PAKEFailure()
+                try:
+                    salt, vkey = authsrp
+                except ValueError:
+                    # bad user/verifier entry
+                    raise PAKEFailure()
+                salt, vkey = binascii.unhexlify(salt), binascii.unhexlify(vkey)
+                svr = srp.Verifier(I, salt, vkey, A)
+                s, B = svr.get_challenge()
+                if s is None or B is None:
+                    raise PAKEFailure()
+                message = '%s %s\n' % (binascii.hexlify(s), binascii.hexlify(B))
+                logger.debug('sending: len %d %r' % (len(message), message, ))
+                len_sent = self.request.send(message)
+                logger.debug('sent: len %d' % (len_sent, ))
+
+                response = reader.next()
+                logger.debug('Received: %r' % response)
+                M = binascii.unhexlify(response.strip())
+                HAMK = svr.verify_session(M)
+                if HAMK is None:
+                    raise PAKEFailure()
+                message = '%s\n' % (binascii.hexlify(HAMK),)
+                logger.debug('sending: len %d %r' % (len(message), message, ))
+                len_sent = self.request.send(message)
+                logger.debug('sent: len %d' % (len_sent, ))
+                if not svr.authenticated():
+                    raise PAKEFailure()
+                # svr.K is now a shared key available to use
+
+                # Resume SKSYNC PROTOCOL
+                response = reader.next()
+                logger.debug('Received: %r' % response)
+            except PAKEFailure:
+                logger.error('SRP PAKEFailure server side, missing auth or client auth does not match server.')
+                message = '\n'  # Empty message so that client should also raise a PAKEFailure
+                logger.debug('sending: len %d %r' % (len(message), message, ))
+                len_sent = self.request.send(message)
+                logger.debug('sent: len %d' % (len_sent, ))
+                if raise_errors:
+                    raise
                 else:
                     return
-            # svr.K is now a shared key available to use
-
-            # Resume SKSYNC PROTOCOL
-            response = reader.next()
-            logger.debug('Received: %r' % response)
 
         # Start of SKSYNC PROTOCOL 01
         assert response in (SKSYNC_PROTOCOL_01, PYSKSYNC_PROTOCOL_01), 'unexpected protocol, %r' % (response,)
