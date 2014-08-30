@@ -364,6 +364,51 @@ def get_file_listings(path_of_files, recursive=False, include_size=False, return
     return listings_result
 
 
+def receive_files(reader, real_client_path, filename_encoding):
+    # if get CR end of session, otherwise get files
+    response = reader.next()
+    logger.debug('Received: %r', response)
+    received_file_count = 0
+    byte_count_recv = 0
+    while response != '\n':
+        filename = response[:-1]  # loose trailing \n
+        logger.debug('filename: %r', filename)
+        filename = filename.decode(filename_encoding)
+        mtime = reader.next()
+        logger.debug('mtime: %r', mtime)
+        mtime = norm_mtime(mtime)
+        mtime = unnorm_mtime(mtime)
+        logger.debug('mtime: %r', mtime)
+        filesize = reader.next()
+        logger.debug('filesize: %r', filesize)
+        filesize = int(filesize)
+        logger.debug('filesize: %r', filesize)
+        logger.info('processing %r', ((filename, filesize, mtime),))  # TODO add option to supress this?
+        
+        # now read filesize bytes....
+        filecontents = reader.recv(filesize)
+        logger.debug('filecontents: %r', filecontents)
+        
+        full_filename = os.path.join(real_client_path, filename)
+        full_filename_dir = os.path.dirname(full_filename)
+        # Not all platforms support Unicode file names (e.g. Python android)
+        full_filename = full_filename.encode(SYSTEM_ENCODING)
+        full_filename_dir = full_filename_dir.encode(SYSTEM_ENCODING)
+
+        #if not exists full_filename_dir
+        safe_mkdir(full_filename_dir)
+        f = open(full_filename, 'wb')
+        f.write(filecontents)
+        f.close()
+        set_utime(full_filename, (mtime, mtime))
+        received_file_count += 1
+        byte_count_recv += len(filecontents)
+
+        # any more files?
+        response = reader.next()
+        logger.debug('Received: %r', response)
+    return byte_count_recv, received_file_count
+
 class MyTCPHandler(SocketServer.BaseRequestHandler):
     """
     The RequestHandler class for our server.
@@ -989,48 +1034,7 @@ def client_start_sync(ip, port, server_path, client_path, sync_type=SKSYNC_PROTO
     logger.debug('Received: %r', response)
     assert response == '\n'
 
-    # if get CR end of session, otherwise get files
-    response = reader.next()
-    logger.debug('Received: %r', response)
-    received_file_count = 0
-    byte_count_recv = 0
-    while response != '\n':
-        filename = response[:-1]  # loose trailing \n
-        logger.debug('filename: %r', filename)
-        filename = filename.decode(filename_encoding)
-        mtime = reader.next()
-        logger.debug('mtime: %r', mtime)
-        mtime = norm_mtime(mtime)
-        mtime = unnorm_mtime(mtime)
-        logger.debug('mtime: %r', mtime)
-        filesize = reader.next()
-        logger.debug('filesize: %r', filesize)
-        filesize = int(filesize)
-        logger.debug('filesize: %r', filesize)
-        logger.info('processing %r', ((filename, filesize, mtime),))  # TODO add option to supress this?
-        
-        # now read filesize bytes....
-        filecontents = reader.recv(filesize)
-        logger.debug('filecontents: %r', filecontents)
-        
-        full_filename = os.path.join(real_client_path, filename)
-        full_filename_dir = os.path.dirname(full_filename)
-        # Not all platforms support Unicode file names (e.g. Python android)
-        full_filename = full_filename.encode(SYSTEM_ENCODING)
-        full_filename_dir = full_filename_dir.encode(SYSTEM_ENCODING)
-
-        #if not exists full_filename_dir
-        safe_mkdir(full_filename_dir)
-        f = open(full_filename, 'wb')
-        f.write(filecontents)
-        f.close()
-        set_utime(full_filename, (mtime, mtime))
-        received_file_count += 1
-        byte_count_recv += len(filecontents)
-
-        # any more files?
-        response = reader.next()
-        logger.debug('Received: %r', response)
+    byte_count_recv, received_file_count = receive_files(reader, real_client_path, filename_encoding)
 
     # Clean up
     s.close()
