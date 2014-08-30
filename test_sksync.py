@@ -191,6 +191,10 @@ class GenericSetup(unittest.TestCase):
         check_file_contents_and_mtime(pathname, filename, self.test_fixtures)
 
 
+    def perform_sync(self, server_dir, client_dir, HOST='127.0.0.1', PORT=get_random_port(), recursive=False, config=None):
+        perform_sync(server_dir, client_dir, HOST=HOST, PORT=PORT, recursive=recursive, config=config)
+
+
 class TestSKSync(GenericSetup):
     def setUp(self, test_fixtures=test_fixtures_us_ascii):
         GenericSetup.setUp(self, test_fixtures)
@@ -215,7 +219,7 @@ class TestSKSync(GenericSetup):
         self.check_file_contents_and_mtime(self.server_dir, self.TEST_FILENAME_3)
 
         # do sync
-        perform_sync(self.server_dir, self.client_dir, config=self.config)
+        self.perform_sync(self.server_dir, self.client_dir, config=self.config)
         
         # check files exist
         self.assertTrue(os.path.isfile(os.path.join(self.client_dir, self.TEST_FILENAME_1)))
@@ -247,7 +251,7 @@ class TestSKSync(GenericSetup):
             self.check_file_contents_and_mtime(self.server_dir, filename)
 
         # do sync
-        perform_sync(self.server_dir, self.client_dir, config=self.config)
+        self.perform_sync(self.server_dir, self.client_dir, config=self.config)
         
         # check files exist
         for filename in self.test_fixtures:
@@ -277,7 +281,7 @@ class TestSKSync(GenericSetup):
             self.check_file_contents_and_mtime(self.server_dir, filename)
 
         # do sync
-        perform_sync(self.server_dir, self.client_dir, config=self.config)
+        self.perform_sync(self.server_dir, self.client_dir, config=self.config)
         
         # check files exist
         for filename in self.test_fixtures:
@@ -307,7 +311,7 @@ class TestSKSync(GenericSetup):
             self.check_file_contents_and_mtime(self.server_dir, filename)
 
         # do sync
-        perform_sync(self.server_dir, self.client_dir, config=self.config)
+        self.perform_sync(self.server_dir, self.client_dir, config=self.config)
         
         # check files exist
         for filename in self.test_fixtures:
@@ -348,7 +352,7 @@ class TestSKSync(GenericSetup):
         self.check_file_contents_and_mtime(self.server_dir, self.TEST_FILENAME_3)
 
         # do sync
-        perform_sync(self.server_dir, self.client_dir, recursive=True)
+        self.perform_sync(self.server_dir, self.client_dir, recursive=True)
         #x = raw_input('pausned')
         
         # check files exist
@@ -406,7 +410,7 @@ class TestSKSyncWithSSL(GenericSetup):
         safe_mkdir(self.client_dir)
         result = os.path.isdir(self.server_dir)
 
-        # clone of perform_sync(server_dir, client_dir, 
+        # clone of self.perform_sync(server_dir, client_dir, 
         HOST = '127.0.0.1'
         PORT = get_random_port()
         config = self.config
@@ -494,7 +498,7 @@ class TestSKSyncWithInvalidAuthPassword(GenericSetup):
 
         # do sync
         def doit():
-            perform_sync(self.server_dir, self.client_dir, config=self.config)
+            self.perform_sync(self.server_dir, self.client_dir, config=self.config)
         self.assertRaises(sksync.PAKEFailure, doit)
         # Both a server and client failure is expected
 
@@ -525,7 +529,7 @@ class TestSKSyncWithInvalidAuthMissingUser(GenericSetup):
 
         # do sync
         def doit():
-            perform_sync(self.server_dir, self.client_dir, config=self.config)
+            self.perform_sync(self.server_dir, self.client_dir, config=self.config)
         self.assertRaises(sksync.PAKEFailure, doit)
         # Both a server and client failure is expected
 
