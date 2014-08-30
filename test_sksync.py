@@ -172,10 +172,10 @@ class TestFileWalk(unittest.TestCase):
 
 
 class GenericSetup(unittest.TestCase):
-    def setUp(self, test_fixtures=test_fixtures_us_ascii):
+    def setUp(self, test_fixtures=test_fixtures_us_ascii, server_dir=os.path.join('tmp_testsuitedir', 'server'), client_dir=os.path.join('tmp_testsuitedir', 'client')):
         # NOTE using Python unittest, setUp() is called before EACH and every
-        self.server_dir = os.path.join('tmp_testsuitedir', 'server')
-        self.client_dir = os.path.join('tmp_testsuitedir', 'client')
+        self.server_dir = server_dir
+        self.client_dir = client_dir
         self.test_fixtures = test_fixtures
         create_test_files(self.test_fixtures, testdir=self.server_dir)
         safe_rmtree(self.client_dir)
@@ -196,10 +196,11 @@ class GenericSetup(unittest.TestCase):
 
 
 class TestSKSync(GenericSetup):
-    def setUp(self, test_fixtures=test_fixtures_us_ascii):
-        GenericSetup.setUp(self, test_fixtures)
+    def setUp(self, test_fixtures=test_fixtures_us_ascii, server_dir=os.path.join('tmp_testsuitedir', 'server'), client_dir=os.path.join('tmp_testsuitedir', 'client')):
+        GenericSetup.setUp(self, test_fixtures, server_dir=server_dir, client_dir=client_dir)
 
     def test_sync_from_server_with_times_to_empty_client_directory(self):
+        #import pdb ; pdb.set_trace()
         safe_rmtree(self.client_dir)
         safe_mkdir(self.client_dir)
         result = os.path.isdir(self.server_dir)
@@ -394,6 +395,47 @@ class TestSKSyncWhitelistFail(TestSKSync):
 class TestSKSyncLatin1Files(TestSKSync):
     def setUp(self, test_fixtures=test_fixtures_latin1):
         GenericSetup.setUp(self, test_fixtures)
+
+
+class TestSKSyncClientPush(TestSKSync):
+    #def setUp(self, test_fixtures=test_fixtures_us_ascii, server_dir=os.path.join('tmp_testsuitedir', 'server'), client_dir=os.path.join('tmp_testsuitedir', 'client')):
+    def setUp(self, test_fixtures=test_fixtures_us_ascii, server_dir=os.path.join('tmp_testsuitedir', 'client'), client_dir=os.path.join('tmp_testsuitedir', 'server')):
+        # NOTE switch client and server directory
+        GenericSetup.setUp(self, test_fixtures, server_dir=server_dir, client_dir=client_dir)
+
+    def perform_sync(self, server_dir, client_dir, HOST='127.0.0.1', PORT=get_random_port(), recursive=False, config=None):
+        config = config or {}
+        config['host'] = HOST
+        config['port'] = PORT
+        config['require_auth'] = config.get('require_auth', False)
+        #config['server_path'] = server_dir
+        #config['client_path'] = client_dir
+        config['clients'] = config.get('clients', {})
+        config['clients']['testing'] = {}
+        config['clients']['testing']['server_path'] = client_dir  # NOTE switch client/server directory
+        config['clients']['testing']['client_path'] = server_dir  # NOTE switch client/server directory
+        config['clients']['testing']['recursive'] = recursive
+        config['clients']['testing']['sync_type'] = sksync.SKSYNC_PROTOCOL_TYPE_TO_SERVER_USE_TIME
+        config = sksync.set_default_config(config)
+
+        # Start sync server in thread
+        server = sksync.MyThreadedTCPServer((HOST, PORT), sksync.MyTCPHandler)
+        try:
+            host, port = server.server_address
+            server.sksync_config = config
+
+            # Start a thread with the server, in turn that thread will then start additional threads
+            # One additional thread for each client request/connection
+            server_thread = threading.Thread(target=server.serve_forever)
+            # Exit the server thread when the main thread terminates
+            server_thread.daemon = True
+            server_thread.start()
+            #print "Server loop running in thread:", server_thread.name
+            
+            # do sync
+            sksync.run_client(config, config_name='testing')
+        finally:
+            server.shutdown()
 
 
 class TestSKSyncWithSSL(GenericSetup):
