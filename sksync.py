@@ -364,7 +364,32 @@ def get_file_listings(path_of_files, recursive=False, include_size=False, return
     return listings_result
 
 
-def receive_files(reader, real_client_path, filename_encoding):
+def receive_file_content(reader, filename, full_filename, full_filename_dir, mtime):
+    mtime = norm_mtime(mtime)
+    mtime = unnorm_mtime(mtime)
+    logger.debug('mtime: %r', mtime)
+
+    filesize = reader.next()
+    logger.debug('filesize: %r', filesize)
+    filesize = int(filesize)
+    logger.debug('filesize: %r', filesize)
+    logger.info('processing %r', ((filename, filesize, mtime),))  # TODO add option to supress this?
+
+    # now read filesize bytes....
+    filecontents = reader.recv(filesize)
+    logger.debug('filecontents: %r', filecontents)
+
+
+    #if not exists full_filename_dir
+    safe_mkdir(full_filename_dir)
+    f = open(full_filename, 'wb')
+    f.write(filecontents)
+    f.close()
+    set_utime(full_filename, (mtime, mtime))
+    return len(filecontents)
+
+
+def receive_files(reader, save_to_dir, filename_encoding):
     # if get CR end of session, otherwise get files
     response = reader.next()
     logger.debug('Received: %r', response)
@@ -376,33 +401,17 @@ def receive_files(reader, real_client_path, filename_encoding):
         filename = filename.decode(filename_encoding)
         mtime = reader.next()
         logger.debug('mtime: %r', mtime)
-        mtime = norm_mtime(mtime)
-        mtime = unnorm_mtime(mtime)
-        logger.debug('mtime: %r', mtime)
-        filesize = reader.next()
-        logger.debug('filesize: %r', filesize)
-        filesize = int(filesize)
-        logger.debug('filesize: %r', filesize)
-        logger.info('processing %r', ((filename, filesize, mtime),))  # TODO add option to supress this?
-        
-        # now read filesize bytes....
-        filecontents = reader.recv(filesize)
-        logger.debug('filecontents: %r', filecontents)
-        
-        full_filename = os.path.join(real_client_path, filename)
+
+        full_filename = os.path.join(save_to_dir, filename)
         full_filename_dir = os.path.dirname(full_filename)
         # Not all platforms support Unicode file names (e.g. Python android)
         full_filename = full_filename.encode(SYSTEM_ENCODING)
         full_filename_dir = full_filename_dir.encode(SYSTEM_ENCODING)
 
-        #if not exists full_filename_dir
-        safe_mkdir(full_filename_dir)
-        f = open(full_filename, 'wb')
-        f.write(filecontents)
-        f.close()
-        set_utime(full_filename, (mtime, mtime))
+        read_len = receive_file_content(reader, filename, full_filename, full_filename_dir, mtime)  # really pass in full_filename_dir?
+
         received_file_count += 1
-        byte_count_recv += len(filecontents)
+        byte_count_recv += read_len
 
         # any more files?
         response = reader.next()
@@ -543,8 +552,9 @@ class MyTCPHandler(SocketServer.BaseRequestHandler):
 
         response = reader.next()
         logger.debug('Received: %r', response)
-        assert response in (SKSYNC_PROTOCOL_TYPE_FROM_SERVER_USE_TIME, ), repr(response)  # type of sync
+        assert response in (SKSYNC_PROTOCOL_TYPE_FROM_SERVER_USE_TIME, SKSYNC_PROTOCOL_TYPE_TO_SERVER_USE_TIME, ), repr(response)  # type of sync
         # FROM SERVER appears to use the same protocol, the difference is in the server logic for working out which files to send to the client
+        sync_type = response
 
         response = reader.next()
         logger.debug('Received: %r', response)
@@ -596,10 +606,7 @@ class MyTCPHandler(SocketServer.BaseRequestHandler):
             client_files[filename] = mtime
             response = reader.next()
             logger.debug('Received: %r', response)
-        
-        # we're done receiving data from client now
-        self.request.send('\n')
-        
+
         # TODO start counting and other stats
         # TODO output count and other stats
         logger.info('Number of files on client %r ', (len(client_files),))
@@ -633,24 +640,15 @@ class MyTCPHandler(SocketServer.BaseRequestHandler):
                 # files same timestamp on client and server, do nothing
                 print 'client sever same'
             """
-        
+
         # if SKSYNC_PROTOCOL_TYPE_BIDIRECTIONAL_* or SKSYNC_PROTOCOL_TYPE_TO_SERVER_*
-        #missing_from_server = client_files_set.difference(server_files_set)
-        
-        # send new files to the client
-        # TODO deal with incoming files from client
-        logger.info('Number of files for server to send %r out of %r ', len(missing_from_client), len(server_files))
-        # TODO consider a progress bar/percent base on number of missing files (not byte count)
-        current_dir = os.getcwd()  # TODO non-ascii; os.getcwdu()
-        os.chdir(server_path)
-        sent_count = 0
-        skip_count = 0
-        byte_count_sent = 0
-        try:
-            for filename in missing_from_client:
+        if sync_type in (SKSYNC_PROTOCOL_TYPE_TO_SERVER_USE_TIME, SKSYNC_PROTOCOL_TYPE_TO_SERVER_NO_TIME, SKSYNC_PROTOCOL_TYPE_BIDIRECTIONAL_USE_TIME, SKSYNC_PROTOCOL_TYPE_BIDIRECTIONAL_NO_TIME):
+            byte_count_recv = received_file_count = 0
+            missing_from_server = client_files_set.difference(server_files_set)
+            for filename in missing_from_server:
                 try:
-                    logger.debug('File to send: %r', filename)
-                    mtime, data_len = server_files[filename]
+                    logger.debug('File to get: %r', filename)
+                    mtime = client_files[filename]
                     if os.path.sep == '\\':
                         # Windows path conversion to Unix/protocol
                         send_filename = filename.replace('\\', '/')
@@ -663,32 +661,83 @@ class MyTCPHandler(SocketServer.BaseRequestHandler):
                         # Need to send binary/byte across wire
                         send_filename = send_filename.encode(filename_encoding)
 
-                    f = open(filename, 'rb')
-                    data = f.read()
-                    f.close()
-                    assert data_len == len(data)
-                    file_details = '%s\n%d\n%d\n' % (send_filename, mtime, data_len)
+                    file_details = '%s\n' % (send_filename, )
                     logger.debug('file_details: %r', file_details)
                     self.request.send(file_details)
-                    self.request.send(data)
-                    sent_count += 1
-                    byte_count_sent += len(data)
+
+                    full_filename = os.path.join(server_path, filename)
+                    full_filename_dir = os.path.dirname(full_filename)
+                    # Not all platforms support Unicode file names (e.g. Python android)
+                    full_filename = full_filename.encode(SYSTEM_ENCODING)
+                    full_filename_dir = full_filename_dir.encode(SYSTEM_ENCODING)
+
+                    byte_count_recv += receive_file_content(reader, filename, full_filename, full_filename_dir, mtime)
+                    received_file_count += 1
+                    #logger.info('%r bytes in %d files sent by client in %s', byte_count_recv, received_file_count, timer_details)  # FIXME timer?
+                    logger.info('%r bytes in %d files sent by client', byte_count_recv, received_file_count)  # FIXME timer?
+
+                    #assert data_len == len(data)
                 except UnicodeEncodeError:
                     # Skip this file
                     logger.error('Encoding error - unable to access and process %r, ignoring', filename)
                     skip_count += 1
                     continue
 
-            # Tell client there are no files to send back
-            self.request.sendall('\n')
-        finally:
-            os.chdir(current_dir)
-        sync_timer.stop()
-        if skip_count:
-            skip_count_str = ', skipped %d' % skip_count
-        else:
-            skip_count_str = ''
-        logger.info('Successfully checked %r, sent %r bytes in %r%s files in %s', len(server_files), byte_count_sent, sent_count, skip_count_str, sync_timer)
+        # we're done receiving data from client now
+        self.request.send('\n')
+
+        if sync_type in (SKSYNC_PROTOCOL_TYPE_FROM_SERVER_USE_TIME, SKSYNC_PROTOCOL_TYPE_FROM_SERVER_NO_TIME, SKSYNC_PROTOCOL_TYPE_BIDIRECTIONAL_USE_TIME, SKSYNC_PROTOCOL_TYPE_BIDIRECTIONAL_NO_TIME):
+            # send new files to the client
+            logger.info('Number of files for server to send %r out of %r ', len(missing_from_client), len(server_files))
+            # TODO consider a progress bar/percent base on number of missing files (not byte count)
+            current_dir = os.getcwd()  # TODO non-ascii; os.getcwdu()
+            os.chdir(server_path)
+            sent_count = 0
+            skip_count = 0
+            byte_count_sent = 0
+            try:
+                for filename in missing_from_client:
+                    try:
+                        logger.debug('File to send: %r', filename)
+                        mtime, data_len = server_files[filename]
+                        if os.path.sep == '\\':
+                            # Windows path conversion to Unix/protocol
+                            send_filename = filename.replace('\\', '/')
+                        else:
+                            send_filename = filename
+                        if isinstance(send_filename, str):
+                            # Assume str, in locale encoding
+                            send_filename = send_filename.decode(SYSTEM_ENCODING)
+                        if isinstance(send_filename, unicode):
+                            # Need to send binary/byte across wire
+                            send_filename = send_filename.encode(filename_encoding)
+
+                        f = open(filename, 'rb')
+                        data = f.read()
+                        f.close()
+                        assert data_len == len(data)
+                        file_details = '%s\n%d\n%d\n' % (send_filename, mtime, data_len)
+                        logger.debug('file_details: %r', file_details)
+                        self.request.send(file_details)
+                        self.request.send(data)
+                        sent_count += 1
+                        byte_count_sent += len(data)
+                    except UnicodeEncodeError:
+                        # Skip this file
+                        logger.error('Encoding error - unable to access and process %r, ignoring', filename)
+                        skip_count += 1
+                        continue
+
+                # Tell client there are no files to send back
+                self.request.sendall('\n')
+            finally:
+                os.chdir(current_dir)
+            sync_timer.stop()
+            if skip_count:
+                skip_count_str = ', skipped %d' % skip_count
+            else:
+                skip_count_str = ''
+            logger.info('Successfully checked %r, sent %r bytes in %r%s files in %s', len(server_files), byte_count_sent, sent_count, skip_count_str, sync_timer)
         logger.info('Client %r disconnected', self.request.getpeername())
 
 
@@ -802,6 +851,8 @@ def client_start_sync(ip, port, server_path, client_path, sync_type=SKSYNC_PROTO
     if sksync1_compat and (use_ssl or (username or password)):
         logger.error('Support for SK Sync v1 is incompatible with SSL/SRP options.')
         raise NotAllowed('Support for SK Sync v1 is incompatible with SSL/SRP options.')
+
+    assert sync_type in (SKSYNC_PROTOCOL_TYPE_FROM_SERVER_USE_TIME, SKSYNC_PROTOCOL_TYPE_TO_SERVER_USE_TIME, ), repr(sync_type)
 
     sync_timer = SimpleTimer()
     sync_timer.start()
@@ -1029,12 +1080,55 @@ def client_start_sync(ip, port, server_path, client_path, sync_type=SKSYNC_PROTO
     len_sent = s.send(message)
     logger.debug('sent: len %d %r', len_sent, message)
 
-    # Receive a response
-    response = reader.next()
-    logger.debug('Received: %r', response)
-    assert response == '\n'
+    byte_count_recv = received_file_count = 0
+    byte_count_sent = sent_file_count = 0
 
-    byte_count_recv, received_file_count = receive_files(reader, real_client_path, filename_encoding)
+    #import pdb ; pdb.set_trace()
+    if sync_type in (SKSYNC_PROTOCOL_TYPE_TO_SERVER_USE_TIME, SKSYNC_PROTOCOL_TYPE_TO_SERVER_NO_TIME, SKSYNC_PROTOCOL_TYPE_BIDIRECTIONAL_USE_TIME, SKSYNC_PROTOCOL_TYPE_BIDIRECTIONAL_NO_TIME):
+        # read filename
+        # then send length, then data filename
+        # in a loop
+        response = reader.next()
+        logger.debug('Received: %r', response)
+        sent_file_count = 0
+        byte_count_sent = 0
+        while response != '\n':
+            filename = response[:-1]  # loose trailing \n
+            logger.debug('filename: %r', filename)
+            filename = filename.decode(filename_encoding)
+
+            full_filename = os.path.join(client_path, filename)
+            full_filename_dir = os.path.dirname(full_filename)
+            # Not all platforms support Unicode file names (e.g. Python android)
+            full_filename = full_filename.encode(SYSTEM_ENCODING)
+            full_filename_dir = full_filename_dir.encode(SYSTEM_ENCODING)
+
+            f = open(full_filename, 'rb')
+            filecontents = f.read()
+            f.close()
+            filecontents_len = len(filecontents)
+
+            message = '%d\n' % filecontents_len
+            len_sent = s.send(message)
+            logger.debug('sent: len %d %r', len_sent, message)
+
+            message = filecontents
+            len_sent = s.send(message)
+            logger.debug('sent: len %d %r', len_sent, message)
+
+            sent_file_count += 1
+            byte_count_sent = filecontents_len
+            response = reader.next()
+            logger.debug('Received: %r', response)
+    else:
+        # from server only?
+
+        # Receive a response
+        response = reader.next()
+        logger.debug('Received: %r', response)
+        assert response == '\n'
+
+        byte_count_recv, received_file_count = receive_files(reader, real_client_path, filename_encoding)
 
     # Clean up
     s.close()
