@@ -961,11 +961,26 @@ def client_start_sync(ip, port, server_path, client_path, sync_type=SKSYNC_PROTO
         # Need to send binary/byte across wire
         client_path = client_path.encode(filename_encoding)
 
+    # following could be sent in one network IO
+    # for ease of code/protocol reading done seperately
+    message = recursive_type
+    len_sent = s.send(message)
+    logger.debug('sent: len %d %r', len_sent, message)
+
+    message = server_path + '\n'
+    len_sent = s.send(message)
+    logger.debug('sent: len %d %r', len_sent, message)
+
+    message = client_path + '\n'
+    len_sent = s.send(message)
+    logger.debug('sent: len %d %r', len_sent, message)
+
     if file_list_str:
-        # FIXME this could be refactored....
-        message = recursive_type + server_path + '\n' + client_path + '\n' + file_list_str + '\n\n'
-    else:
-        message = recursive_type + server_path + '\n' + client_path + '\n\n'
+        message = file_list_str
+        len_sent = s.send(message)
+        logger.debug('sent: len %d %r', len_sent, message)
+
+    message = '\n\n'
     len_sent = s.send(message)
     logger.debug('sent: len %d %r', len_sent, message)
 
