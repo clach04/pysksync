@@ -686,16 +686,16 @@ class MyTCPHandler(SocketServer.BaseRequestHandler):
         # we're done receiving data from client now
         self.request.send('\n')
 
-        if sync_type in (SKSYNC_PROTOCOL_TYPE_FROM_SERVER_USE_TIME, SKSYNC_PROTOCOL_TYPE_FROM_SERVER_NO_TIME, SKSYNC_PROTOCOL_TYPE_BIDIRECTIONAL_USE_TIME, SKSYNC_PROTOCOL_TYPE_BIDIRECTIONAL_NO_TIME):
-            # send new files to the client
-            logger.info('Number of files for server to send %r out of %r ', len(missing_from_client), len(server_files))
-            # TODO consider a progress bar/percent base on number of missing files (not byte count)
-            current_dir = os.getcwd()  # TODO non-ascii; os.getcwdu()
-            os.chdir(server_path)
-            sent_count = 0
-            skip_count = 0
-            byte_count_sent = 0
-            try:
+        # send new files to the client
+        logger.info('Number of files for server to send %r out of %r ', len(missing_from_client), len(server_files))
+        # TODO consider a progress bar/percent base on number of missing files (not byte count)
+        current_dir = os.getcwd()  # TODO non-ascii; os.getcwdu()
+        os.chdir(server_path)
+        sent_count = 0
+        skip_count = 0
+        byte_count_sent = 0
+        try:
+            if sync_type in (SKSYNC_PROTOCOL_TYPE_FROM_SERVER_USE_TIME, SKSYNC_PROTOCOL_TYPE_FROM_SERVER_NO_TIME, SKSYNC_PROTOCOL_TYPE_BIDIRECTIONAL_USE_TIME, SKSYNC_PROTOCOL_TYPE_BIDIRECTIONAL_NO_TIME):
                 for filename in missing_from_client:
                     try:
                         logger.debug('File to send: %r', filename)
@@ -729,15 +729,15 @@ class MyTCPHandler(SocketServer.BaseRequestHandler):
                         continue
 
                 # Tell client there are no files to send back
-                self.request.sendall('\n')
-            finally:
-                os.chdir(current_dir)
-            sync_timer.stop()
-            if skip_count:
-                skip_count_str = ', skipped %d' % skip_count
-            else:
-                skip_count_str = ''
-            logger.info('Successfully checked %r, sent %r bytes in %r%s files in %s', len(server_files), byte_count_sent, sent_count, skip_count_str, sync_timer)
+            self.request.sendall('\n')
+        finally:
+            os.chdir(current_dir)
+        sync_timer.stop()
+        if skip_count:
+            skip_count_str = ', skipped %d' % skip_count
+        else:
+            skip_count_str = ''
+        logger.info('Successfully checked %r, sent %r bytes in %r%s files in %s', len(server_files), byte_count_sent, sent_count, skip_count_str, sync_timer)
         logger.info('Client %r disconnected', self.request.getpeername())
 
 
