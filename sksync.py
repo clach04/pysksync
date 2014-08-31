@@ -1120,6 +1120,10 @@ def client_start_sync(ip, port, server_path, client_path, sync_type=SKSYNC_PROTO
             byte_count_sent = filecontents_len
             response = reader.next()
             logger.debug('Received: %r', response)
+        # Receive a response
+        response = reader.next()
+        logger.debug('Received: %r', response)
+        assert response == '\n'
     else:
         # from server only?
 
