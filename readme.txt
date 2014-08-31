@@ -13,7 +13,11 @@ Start server with default settings:
 
     python sksync.py
 
-This server is compatible with SK Sync Android client.
+Start client, note requires settings file, e.g. `sksync.json`:
+
+    python sksync.py sksync.json client CLIENTNAME
+
+Where CLIENTNAME is specified in the settings file covered later.
 
 Change server settings, provide a file called `sksync.json`
 
