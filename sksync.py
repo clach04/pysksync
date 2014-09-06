@@ -395,7 +395,15 @@ def send_file_content(sender, filename, file_meta_data=None):
     return filecontents_len
 
 
-def receive_file_content(reader, filename, full_filename, full_filename_dir, mtime, file_safety=FILE_SAFETY_RENAME_AFTER_WRITE):
+def receive_file_content(reader, full_filename, mtime, file_safety=FILE_SAFETY_RENAME_AFTER_WRITE):
+    """
+        @reader - (buffered) socket to read from
+        @full_filename - expected to be a Unicode string
+        @mtime - file modification time
+        @file_safety - technique to use to protect existing files in case of error
+    """
+    full_filename_dir = os.path.dirname(full_filename)
+    # TODO? Android filename encoding hack?
     mtime = norm_mtime(mtime)
     mtime = unnorm_mtime(mtime)
     logger.debug('mtime: %r', mtime)
@@ -404,7 +412,7 @@ def receive_file_content(reader, filename, full_filename, full_filename_dir, mti
     logger.debug('filesize: %r', filesize)
     filesize = int(filesize)
     logger.debug('filesize: %r', filesize)
-    logger.info('processing %r', ((filename, filesize, mtime),))  # TODO add option to supress this?
+    logger.info('processing %r', ((full_filename, filesize, mtime),))  # TODO add option to supress this?
 
     # Now buffer entire file contents
     # if there is a network error existing files are left alone
@@ -460,12 +468,8 @@ def receive_files(reader, save_to_dir, filename_encoding):
         logger.debug('mtime: %r', mtime)
 
         full_filename = os.path.join(save_to_dir, filename)
-        full_filename_dir = os.path.dirname(full_filename)
-        # Not all platforms support Unicode file names (e.g. Python android)
-        full_filename = full_filename.encode(SYSTEM_ENCODING)
-        full_filename_dir = full_filename_dir.encode(SYSTEM_ENCODING)
 
-        read_len = receive_file_content(reader, filename, full_filename, full_filename_dir, mtime)  # really pass in full_filename_dir?
+        read_len = receive_file_content(reader, full_filename, mtime)
 
         received_file_count += 1
         byte_count_recv += read_len
@@ -703,42 +707,30 @@ class MyTCPHandler(SocketServer.BaseRequestHandler):
             byte_count_recv = received_file_count = 0
             missing_from_server = client_files_set.difference(server_files_set)
             for filename in missing_from_server:
-                try:
-                    logger.debug('File to get: %r', filename)
-                    mtime = client_files[filename]
-                    if os.path.sep == '\\':
-                        # Windows path conversion to Unix/protocol
-                        send_filename = filename.replace('\\', '/')
-                    else:
-                        send_filename = filename
-                    if isinstance(send_filename, str):
-                        # Assume str, in locale encoding
-                        send_filename = send_filename.decode(SYSTEM_ENCODING)
-                    if isinstance(send_filename, unicode):
-                        # Need to send binary/byte across wire
-                        send_filename = send_filename.encode(filename_encoding)
+                logger.debug('File to get: %r', filename)
+                mtime = client_files[filename]
+                if os.path.sep == '\\':
+                    # Windows path conversion to Unix/protocol
+                    send_filename = filename.replace('\\', '/')
+                else:
+                    send_filename = filename
+                if isinstance(send_filename, str):
+                    # Assume str, in locale encoding
+                    send_filename = send_filename.decode(SYSTEM_ENCODING)
+                if isinstance(send_filename, unicode):
+                    # Need to send binary/byte across wire
+                    send_filename = send_filename.encode(filename_encoding)
 
-                    file_details = '%s\n' % (send_filename, )
-                    logger.debug('file_details: %r', file_details)
-                    self.request.send(file_details)
+                file_details = '%s\n' % (send_filename, )
+                logger.debug('file_details: %r', file_details)
+                self.request.send(file_details)
 
-                    full_filename = os.path.join(server_path, filename)
-                    full_filename_dir = os.path.dirname(full_filename)
-                    # Not all platforms support Unicode file names (e.g. Python android)
-                    full_filename = full_filename.encode(SYSTEM_ENCODING)
-                    full_filename_dir = full_filename_dir.encode(SYSTEM_ENCODING)
+                full_filename = os.path.join(server_path, filename)
 
-                    byte_count_recv += receive_file_content(reader, filename, full_filename, full_filename_dir, mtime)
-                    received_file_count += 1
-                    #logger.info('%r bytes in %d files sent by client in %s', byte_count_recv, received_file_count, timer_details)  # FIXME timer?
-                    logger.info('%r bytes in %d files sent by client', byte_count_recv, received_file_count)  # FIXME timer?
-
-                    #assert data_len == len(data)
-                except UnicodeEncodeError:
-                    # Skip this file
-                    logger.error('Encoding error - unable to access and process %r, ignoring', filename)
-                    skip_count += 1
-                    continue
+                byte_count_recv += receive_file_content(reader, full_filename, mtime)
+                received_file_count += 1
+                #logger.info('%r bytes in %d files sent by client in %s', byte_count_recv, received_file_count, timer_details)  # FIXME timer?
+                logger.info('%r bytes in %d files sent by client', byte_count_recv, received_file_count)  # FIXME timer?
 
         # we're done receiving data from client now
         self.request.send('\n')
