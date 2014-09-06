@@ -397,6 +397,8 @@ class TestSKSyncLatin1Files(TestSKSync):
         GenericSetup.setUp(self, test_fixtures)
 
 
+# document client to server (SKSYNC_PROTOCOL_TYPE_TO_SERVER_USE_TIME) - currently this test is the only documentation
+# TODO test bi-directional (SKSYNC_PROTOCOL_TYPE_BIDIRECTIONAL_USE_TIME) sync
 class TestSKSyncClientPush(TestSKSync):
     #def setUp(self, test_fixtures=test_fixtures_us_ascii, server_dir=os.path.join('tmp_testsuitedir', 'server'), client_dir=os.path.join('tmp_testsuitedir', 'client')):
     def setUp(self, test_fixtures=test_fixtures_us_ascii, server_dir=os.path.join('tmp_testsuitedir', 'client'), client_dir=os.path.join('tmp_testsuitedir', 'server')):
