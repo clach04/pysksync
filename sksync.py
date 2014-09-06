@@ -922,13 +922,16 @@ def client_start_sync(ip, port, server_path, client_path, sync_type=SKSYNC_PROTO
 
     logger.info('filename_encoding %r', filename_encoding)
     logger.info('determining client files for %r', real_client_path)
-    file_list = get_file_listings(real_client_path, recursive=recursive)
+    file_list = get_file_listings(real_client_path, recursive=recursive, force_unicode=True)
     file_list_info = []
     for filename, mtime in file_list:
         try:
             if isinstance(filename, str):
                 # Assume str, in locale encoding
                 filename = filename.decode(SYSTEM_ENCODING)
+            # Check filename allowed in transport encoding, for backwards compat
+            # for utf-8 over the wire (i.e. not using Original SK Server/client)
+            # this check is not needed
             if isinstance(filename, unicode):
                 # Need to send binary/byte across wire
                 filename = filename.encode(filename_encoding)
@@ -944,7 +947,7 @@ def client_start_sync(ip, port, server_path, client_path, sync_type=SKSYNC_PROTO
     delta = len(file_list) - len(file_list_info)
     if delta != 0:
         logger.info('Skiping %d', delta)
-    file_list_str = '\n'.join(file_list_info)
+    file_list_str = '\n'.join(file_list_info)  # this is bytes
 
     # Connect to the server
     logger.info('client connecting to server %s:%d', ip, port)
