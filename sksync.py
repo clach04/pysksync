@@ -126,6 +126,12 @@ if ssl:
 PYSKSYNC_CR_START = 'PYSKSYNC SRP START:'  # Challenge Response start message
 
 
+# File backup constants used by )
+FILE_SAFETY_NONE = None  # just overwrite existing files
+FILE_SAFETY_BACKUP = 1  # Backup file - which can cause issues/duplicates with bi-directional sync
+FILE_SAFETY_RENAME_AFTER_WRITE = 2  # Only replace file after success file IO (avoids loss of existing files on out of disk space errors, etc.)
+
+
 class BaseSkSyncException(Exception):
     '''Base SK Sync exception'''
 
@@ -389,7 +395,7 @@ def send_file_content(sender, filename, file_meta_data=None):
     return filecontents_len
 
 
-def receive_file_content(reader, filename, full_filename, full_filename_dir, mtime):
+def receive_file_content(reader, filename, full_filename, full_filename_dir, mtime, file_safety=FILE_SAFETY_RENAME_AFTER_WRITE):
     mtime = norm_mtime(mtime)
     mtime = unnorm_mtime(mtime)
     logger.debug('mtime: %r', mtime)
@@ -400,17 +406,43 @@ def receive_file_content(reader, filename, full_filename, full_filename_dir, mti
     logger.debug('filesize: %r', filesize)
     logger.info('processing %r', ((filename, filesize, mtime),))  # TODO add option to supress this?
 
-    # now read filesize bytes....
+    # Now buffer entire file contents
+    # if there is a network error existing files are left alone
     filecontents = reader.recv(filesize)
     logger.debug('filecontents: %r', filecontents)
 
-
     #if not exists full_filename_dir
     safe_mkdir(full_filename_dir)
+
+    safety_filename = None
+    if file_safety in (FILE_SAFETY_BACKUP, FILE_SAFETY_RENAME_AFTER_WRITE) and os.path.exists(full_filename):
+        # generate backup/temp filename
+        # NOTE FILE_SAFETY_RENAME_AFTER_WRITE really should make use of tempfile.*()
+        safety_filename = full_filename + '_skb'  # could include timestamp or even random tmp name, NOTE assumes no files end in '*_skb'!
+    else:
+        file_safety = FILE_SAFETY_NONE  # no file to backup so ensure no backup ops take place
+    if file_safety == FILE_SAFETY_BACKUP:
+            # rename existing file now as backup
+            if os.path.exists(safety_filename):
+                # Under Windows can not rename when destination already exists
+                os.remove(safety_filename)
+            os.rename(full_filename, safety_filename)
+    elif file_safety == FILE_SAFETY_RENAME_AFTER_WRITE:
+        if os.path.exists(safety_filename):
+            # Under Windows can not rename when destination already exists
+            os.remove(safety_filename)
+        full_filename, safety_filename = safety_filename, full_filename
+
     f = open(full_filename, 'wb')
     f.write(filecontents)
     f.close()
     set_utime(full_filename, (mtime, mtime))
+
+    if file_safety == FILE_SAFETY_RENAME_AFTER_WRITE:
+        # Under Windows can not rename when destination already exists
+        os.remove(safety_filename)
+        os.rename(full_filename, safety_filename)
+
     return len(filecontents)
 
 
