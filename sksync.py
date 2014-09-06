@@ -647,6 +647,7 @@ class MyTCPHandler(SocketServer.BaseRequestHandler):
                 else:
                     logger.error('client requested path %r which is not in "server_dir_whitelist"', server_path)
                     raise NotAllowed('access to path %r' % server_path)
+        server_path = unicode(server_path)  # Ensure server directory is Unicode
 
         client_path = reader.next()
         logger.debug('client_path: %r', client_path)
