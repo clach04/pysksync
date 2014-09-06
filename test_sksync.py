@@ -49,6 +49,10 @@ test_fixtures_asia = {
 
 
 def safe_rmtree(testdir):
+    """Windows fails to delete filenames with characters not in locale
+    if directory name was not encoded in Unicode to begin with
+    even if directory name s 7 bit clean ASCII!"""
+    testdir = unicode(testdir)
     if '*' in testdir:
         raise ValueError('directory name %r appears to contain wildcard' % testdir)
     try:
