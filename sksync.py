@@ -364,6 +364,31 @@ def get_file_listings(path_of_files, recursive=False, include_size=False, return
     return listings_result
 
 
+def send_file_content(sender, filename, file_meta_data=None):
+    if file_meta_data:
+        send_filename, mtime, data_len = file_meta_data
+
+    f = open(filename, 'rb')
+    filecontents = f.read()
+    f.close()
+    filecontents_len = len(filecontents)
+
+    if file_meta_data is not None:
+        assert data_len == filecontents_len
+        message = '%s\n%d\n%d\n' % (send_filename, mtime, data_len)
+    else:
+        message = '%d\n' % filecontents_len
+    len_sent = sender.send(message)
+    logger.debug('sent: len %d %r', len_sent, message)
+
+    message = filecontents
+    len_sent = sender.send(message)
+    #logger.debug('sent: len %d %r', len_sent, message)
+    logger.debug('sent: len %d', len_sent)
+
+    return filecontents_len
+
+
 def receive_file_content(reader, filename, full_filename, full_filename_dir, mtime):
     mtime = norm_mtime(mtime)
     mtime = unnorm_mtime(mtime)
@@ -712,16 +737,9 @@ class MyTCPHandler(SocketServer.BaseRequestHandler):
                             # Need to send binary/byte across wire
                             send_filename = send_filename.encode(filename_encoding)
 
-                        f = open(filename, 'rb')
-                        data = f.read()
-                        f.close()
-                        assert data_len == len(data)
-                        file_details = '%s\n%d\n%d\n' % (send_filename, mtime, data_len)
-                        logger.debug('file_details: %r', file_details)
-                        self.request.send(file_details)
-                        self.request.send(data)
+                        file_len = send_file_content(self.request, filename, file_meta_data=(send_filename, mtime, data_len))
                         sent_count += 1
-                        byte_count_sent += len(data)
+                        byte_count_sent += file_len
                     except UnicodeEncodeError:
                         # Skip this file
                         logger.error('Encoding error - unable to access and process %r, ignoring', filename)
@@ -1103,21 +1121,8 @@ def client_start_sync(ip, port, server_path, client_path, sync_type=SKSYNC_PROTO
             full_filename = full_filename.encode(SYSTEM_ENCODING)
             full_filename_dir = full_filename_dir.encode(SYSTEM_ENCODING)
 
-            f = open(full_filename, 'rb')
-            filecontents = f.read()
-            f.close()
-            filecontents_len = len(filecontents)
-
-            message = '%d\n' % filecontents_len
-            len_sent = s.send(message)
-            logger.debug('sent: len %d %r', len_sent, message)
-
-            message = filecontents
-            len_sent = s.send(message)
-            logger.debug('sent: len %d %r', len_sent, message)
-
+            byte_count_sent = send_file_content(s, full_filename)
             sent_file_count += 1
-            byte_count_sent = filecontents_len
             response = reader.next()
             logger.debug('Received: %r', response)
     else:
