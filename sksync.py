@@ -397,11 +397,15 @@ def send_file_content(sender, filename, file_meta_data=None):
         compression_func = compression_lookup[compression_type]['compress']
         # TODO compression_type.split('-') to determine parameters, e.g. compression level
         # one shot (in memory, like file IO) compress
-        filecontents = compression_func(filecontents)  # TODO compression level/parameters
-        compressed_data_len = len(filecontents)
-        # TODO if compressed length is longer use original...
-        data_len_str = '%s %d' % (compression_type, compressed_data_len,)
-    else:
+        compressed_filecontents = compression_func(filecontents)  # TODO compression level/parameters
+        compressed_data_len = len(compressed_filecontents)
+        if filecontents_len <= compressed_data_len:
+            compression_type = None
+        else:
+            data_len_str = '%s %d' % (compression_type, compressed_data_len,)
+            filecontents = compressed_filecontents
+
+    if compression_type is None:
         data_len_str = '%d' % (filecontents_len,)
 
     if file_meta_data is not None:
@@ -426,6 +430,7 @@ def receive_file_content(reader, filename, full_filename, full_filename_dir, mti
 
     filesize = reader.next()
     logger.debug('filesize: %r', filesize)
+    # check for compression details, without checking protocol levels
     filesize_split = filesize.split()
     if len(filesize_split) == 2:
         compression_type, filesize = filesize_split
