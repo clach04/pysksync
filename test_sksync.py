@@ -40,6 +40,13 @@ test_fixtures_latin1 = {
     u'testC.txt': (1345316082.71875 - 72, '4'),
 }
 
+# Asia
+test_fixtures_asia = {
+    u'test\u9152.txt': (1345316082.71875 - 12, '2'),  # Unicode Han Character 'wine, spirits, liquor, alcoholic beverage
+    u'testB.txt': (1345316082.71875 - 72, '3'),
+    u'testC.txt': (1345316082.71875 - 72, '4'),
+}
+
 
 def safe_rmtree(testdir):
     if '*' in testdir:
@@ -394,6 +401,11 @@ class TestSKSyncWhitelistFail(TestSKSync):
 
 class TestSKSyncLatin1Files(TestSKSync):
     def setUp(self, test_fixtures=test_fixtures_latin1):
+        GenericSetup.setUp(self, test_fixtures)
+
+
+class TestSKSyncAsiaFiles(TestSKSync):
+    def setUp(self, test_fixtures=test_fixtures_asia):
         GenericSetup.setUp(self, test_fixtures)
 
 
