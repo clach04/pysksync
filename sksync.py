@@ -323,7 +323,10 @@ def path_walker(path_to_search, filename_filter=None, abspath=False):
 def get_file_listings(path_of_files, recursive=False, include_size=False, return_list=True, force_unicode=False):
     """return_list=True, if False returns dict
     """
-    
+    glob_wildcard = '*'
+    if force_unicode:
+        path_of_files = unicode(path_of_files)
+        glob_wildcard = unicode(glob_wildcard)
     if recursive:
         file_list = list(path_walker(path_of_files))
     current_dir = os.getcwd()  # TODO non-ascii; os.getcwdu()
@@ -333,7 +336,7 @@ def get_file_listings(path_of_files, recursive=False, include_size=False, return
         # TODO include file size param
         # Get non-recursive list of files in real_client_path
         # FIXME TODO nasty hack using glob (i.e. not robust)
-        file_list = glob.glob('*')
+        file_list = glob.glob(glob_wildcard)
     
     if return_list:
         listings_result = []
