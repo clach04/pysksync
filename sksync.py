@@ -97,6 +97,10 @@ except ImportError:
 PYSKSYNC_FILENAME_ENCODING = 'UTF-8'
 FILENAME_ENCODING = 'cp1252'  # latin1 encoding used by sksync 1
 language_name, SYSTEM_ENCODING = locale.getdefaultlocale()
+SUPPORT_UNICODE_TYPE_FILENAME = True
+if SYSTEM_ENCODING is None:
+    # this is probably Android which does not handle Unicode types for filenames
+    SUPPORT_UNICODE_TYPE_FILENAME = False
 # SYSTEM_ENCODING is usually set. If not, default to UTF-8
 # (a good default for Unix, Android, Mac.)
 SYSTEM_ENCODING = SYSTEM_ENCODING or 'UTF-8'  # TODO could allow config setting override
@@ -320,7 +324,7 @@ def path_walker(path_to_search, filename_filter=None, abspath=False):
 
 ###############################################################
 
-def get_file_listings(path_of_files, recursive=False, include_size=False, return_list=True, force_unicode=False):
+def get_file_listings(path_of_files, recursive=False, include_size=False, return_list=True, force_unicode=False, return_unicode=True):
     """return_list=True, if False returns dict
     """
     glob_wildcard = '*'
@@ -348,7 +352,7 @@ def get_file_listings(path_of_files, recursive=False, include_size=False, return
             mtime = x.st_mtime
             # TODO non-ascii path names
             mtime = int(mtime) * 1000  # TODO norm
-            if force_unicode:
+            if return_unicode:
                 if isinstance(filename, str):
                     # This is probably Windows
                     # Assume str, in locale encoding
@@ -405,6 +409,8 @@ def receive_file_content(reader, full_filename, mtime, file_safety=FILE_SAFETY_R
         @mtime - file modification time
         @file_safety - technique to use to protect existing files in case of error
     """
+    if not SUPPORT_UNICODE_TYPE_FILENAME:
+        full_filename = full_filename.encode(SYSTEM_ENCODING)
     full_filename_dir = os.path.dirname(full_filename)
     # TODO? Android filename encoding hack?
     mtime = norm_mtime(mtime)
@@ -923,7 +929,11 @@ def client_start_sync(ip, port, server_path, client_path, sync_type=SKSYNC_PROTO
 
     logger.info('filename_encoding %r', filename_encoding)
     logger.info('determining client files for %r', real_client_path)
-    file_list = get_file_listings(real_client_path, recursive=recursive, force_unicode=True)
+    if SUPPORT_UNICODE_TYPE_FILENAME:
+        force_unicode = True
+    else:
+        force_unicode = False
+    file_list = get_file_listings(real_client_path, recursive=recursive, force_unicode=force_unicode)
     file_list_info = []
     skip_count = 0
     for filename, mtime in file_list:
