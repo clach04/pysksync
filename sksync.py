@@ -1193,6 +1193,9 @@ def run_client(config, config_name='client'):
     client_config = config['clients'][config_name]
     server_path, client_path = client_config['server_path'], client_config['client_path']
     host, port = client_config.get('host', host), client_config.get('port', port)
+    client_sksync1_compat = client_config.get('sksync1_compat') 
+    if client_sksync1_compat is not None:
+        sksync1_compat = client_sksync1_compat
     recursive = client_config.get('recursive')
     sync_type = client_config.get('sync_type', SKSYNC_PROTOCOL_TYPE_FROM_SERVER_USE_TIME)  # TODO not user friendly...
 
