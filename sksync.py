@@ -18,6 +18,8 @@ import glob
 import errno
 import binascii
 import locale
+import zlib
+import bz2
 
 try:
     #raise ImportError ## Debug, pretend we are 2.3 and earlier
@@ -125,6 +127,17 @@ if ssl:
 # PYSKSYNC specific constants
 PYSKSYNC_CR_START = 'PYSKSYNC SRP START:'  # Challenge Response start message
 
+# Compression lookup, could add alternatives like snappy, lz*, etc.
+compression_lookup = {
+    'gz': {
+        'compress': zlib.compress,
+        'decompress': zlib.decompress,
+    },
+    'bz2': {
+        'compress': bz2.compress,
+        'decompress': bz2.decompress,
+    },
+}
 
 class BaseSkSyncException(Exception):
     '''Base SK Sync exception'''
@@ -375,9 +388,30 @@ def send_file_content(sender, filename, file_meta_data=None):
 
     if file_meta_data is not None:
         assert data_len == filecontents_len
-        message = '%s\n%d\n%d\n' % (send_filename, mtime, data_len)
+
+    compression_type = 'gz'
+    #compression_type = 'bz2'
+    #compression_type = None
+    # TODO compress black list (e.g. don't attempt to compress; .zip, .png, .jpg, .mp3, ....
+    if compression_type:
+        compression_func = compression_lookup[compression_type]['compress']
+        # TODO compression_type.split('-') to determine parameters, e.g. compression level
+        # one shot (in memory, like file IO) compress
+        compressed_filecontents = compression_func(filecontents)  # TODO compression level/parameters
+        compressed_data_len = len(compressed_filecontents)
+        if filecontents_len <= compressed_data_len:
+            compression_type = None
+        else:
+            data_len_str = '%s %d' % (compression_type, compressed_data_len,)
+            filecontents = compressed_filecontents
+
+    if compression_type is None:
+        data_len_str = '%d' % (filecontents_len,)
+
+    if file_meta_data is not None:
+        message = '%s\n%d\n%s\n' % (send_filename, mtime, data_len_str)
     else:
-        message = '%d\n' % filecontents_len
+        message = '%s\n' % data_len_str
     len_sent = sender.send(message)
     logger.debug('sent: len %d %r', len_sent, message)
 
@@ -396,6 +430,12 @@ def receive_file_content(reader, filename, full_filename, full_filename_dir, mti
 
     filesize = reader.next()
     logger.debug('filesize: %r', filesize)
+    # check for compression details, without checking protocol levels
+    filesize_split = filesize.split()
+    if len(filesize_split) == 2:
+        compression_type, filesize = filesize_split
+    else:
+        compression_type = None
     filesize = int(filesize)
     logger.debug('filesize: %r', filesize)
     logger.info('processing %r', ((filename, filesize, mtime),))  # TODO add option to supress this?
@@ -404,6 +444,10 @@ def receive_file_content(reader, filename, full_filename, full_filename_dir, mti
     filecontents = reader.recv(filesize)
     logger.debug('filecontents: %r', filecontents)
 
+    if compression_type:
+        decompression_func = compression_lookup[compression_type]['decompress']
+        # one shot (in memory, like file IO) decompress
+        filecontents = decompression_func(filecontents)
 
     #if not exists full_filename_dir
     safe_mkdir(full_filename_dir)
