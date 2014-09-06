@@ -787,6 +787,7 @@ class MyTCPHandler(SocketServer.BaseRequestHandler):
         if skip_count:
             # extra emphasis in log
             logger.warn('Skipped %d files.', skip_count)
+            logger.info('Skipped files can be avoided if sksync1_compat is disabled.')
         logger.info('Client %r disconnected', self.request.getpeername())
 
 
@@ -924,6 +925,7 @@ def client_start_sync(ip, port, server_path, client_path, sync_type=SKSYNC_PROTO
     logger.info('determining client files for %r', real_client_path)
     file_list = get_file_listings(real_client_path, recursive=recursive, force_unicode=True)
     file_list_info = []
+    skip_count = 0
     for filename, mtime in file_list:
         try:
             if isinstance(filename, str):
@@ -940,6 +942,7 @@ def client_start_sync(ip, port, server_path, client_path, sync_type=SKSYNC_PROTO
         except UnicodeEncodeError:
             # Skip this file
             logger.error('Encoding error - unable to access and process %r, ignoring', filename)
+            skip_count += 1
             # TODO log summary of skipped files at end
             continue
     logger.info('Number of files on client %d', len(file_list))
@@ -1172,8 +1175,10 @@ def client_start_sync(ip, port, server_path, client_path, sync_type=SKSYNC_PROTO
     s.close()
     sync_timer.stop()
     logger.info('%r bytes in %d files sent by server in %s', byte_count_recv, received_file_count, sync_timer)
-    if delta != 0:
-        logger.info('Skipped %d', delta)
+    if skip_count or delta:
+        # extra emphasis in log
+        logger.warn('Skipped %d files (delta %d).', skip_count, delta)
+        logger.info('Skipped files can be avoided if sksync1_compat is disabled.')
     logger.info('disconnected')
 
 
