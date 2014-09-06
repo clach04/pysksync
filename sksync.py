@@ -1129,48 +1129,6 @@ def client_start_sync(ip, port, server_path, client_path, sync_type=SKSYNC_PROTO
     len_sent = s.send(message)
     logger.debug('sent: len %d %r', len_sent, message)
 
-    """
-<<<<<<< local
-    # if get CR end of session, otherwise get files
-    response = reader.next()
-    logger.debug('Received: %r', response)
-    received_file_count = 0
-    byte_count_recv = 0
-    while response != '\n':
-        filename = response[:-1]  # loose trailing \n
-        logger.debug('filename: %r', filename)
-        filename = filename.decode(filename_encoding)
-        mtime = reader.next()
-        logger.debug('mtime: %r', mtime)
-        mtime = norm_mtime(mtime)
-        mtime = unnorm_mtime(mtime)
-        logger.debug('mtime: %r', mtime)
-        filesize = reader.next()
-        logger.debug('filesize: %r', filesize)
-        filesize_split = filesize.split()
-        if len(filesize_split) == 2:
-            compression_type, filesize = filesize_split
-        else:
-            compression_type = None
-        filesize = int(filesize)
-        logger.debug('filesize: %r', filesize)
-        logger.info('processing %r', ((filename, filesize, mtime),))  # TODO add option to supress this?
-        
-        # now read filesize bytes....
-        filecontents = reader.recv(filesize)
-        logger.debug('filecontents: %r', filecontents)
-        if compression_type:
-            decompression_func = compression_lookup[compression_type]['decompress']
-            # one shot (in memory, like file IO) decompress
-            filecontents = decompression_func(filecontents)
-
-        full_filename = os.path.join(real_client_path, filename)
-        full_filename_dir = os.path.dirname(full_filename)
-        # Not all platforms support Unicode file names (e.g. Python android)
-        full_filename = full_filename.encode(SYSTEM_ENCODING)
-        full_filename_dir = full_filename_dir.encode(SYSTEM_ENCODING)
-=======
-    """
     message = client_path + '\n'
     len_sent = s.send(message)
     logger.debug('sent: len %d %r', len_sent, message)
