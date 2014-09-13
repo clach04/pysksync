@@ -99,6 +99,10 @@ except ImportError:
 PYSKSYNC_FILENAME_ENCODING = 'UTF-8'
 FILENAME_ENCODING = 'cp1252'  # latin1 encoding used by sksync 1
 language_name, SYSTEM_ENCODING = locale.getdefaultlocale()
+SUPPORT_UNICODE_TYPE_FILENAME = True
+if SYSTEM_ENCODING is None:
+    # this is probably Android which does not handle Unicode types for filenames
+    SUPPORT_UNICODE_TYPE_FILENAME = False
 # SYSTEM_ENCODING is usually set. If not, default to UTF-8
 # (a good default for Unix, Android, Mac.)
 SYSTEM_ENCODING = SYSTEM_ENCODING or 'UTF-8'  # TODO could allow config setting override
@@ -138,6 +142,12 @@ compression_lookup = {
         'decompress': bz2.decompress,
     },
 }
+
+# File backup constants used by )
+FILE_SAFETY_NONE = None  # just overwrite existing files
+FILE_SAFETY_BACKUP = 1  # Backup file - which can cause issues/duplicates with bi-directional sync
+FILE_SAFETY_RENAME_AFTER_WRITE = 2  # Only replace file after success file IO (avoids loss of existing files on out of disk space errors, etc.)
+
 
 class BaseSkSyncException(Exception):
     '''Base SK Sync exception'''
@@ -327,10 +337,13 @@ def path_walker(path_to_search, filename_filter=None, abspath=False):
 
 ###############################################################
 
-def get_file_listings(path_of_files, recursive=False, include_size=False, return_list=True, force_unicode=False):
+def get_file_listings(path_of_files, recursive=False, include_size=False, return_list=True, force_unicode=False, return_unicode=True):
     """return_list=True, if False returns dict
     """
-    
+    glob_wildcard = '*'
+    if force_unicode:
+        path_of_files = unicode(path_of_files)
+        glob_wildcard = unicode(glob_wildcard)
     if recursive:
         file_list = list(path_walker(path_of_files))
     current_dir = os.getcwd()  # TODO non-ascii; os.getcwdu()
@@ -340,7 +353,7 @@ def get_file_listings(path_of_files, recursive=False, include_size=False, return
         # TODO include file size param
         # Get non-recursive list of files in real_client_path
         # FIXME TODO nasty hack using glob (i.e. not robust)
-        file_list = glob.glob('*')
+        file_list = glob.glob(glob_wildcard)
     
     if return_list:
         listings_result = []
@@ -352,7 +365,7 @@ def get_file_listings(path_of_files, recursive=False, include_size=False, return
             mtime = x.st_mtime
             # TODO non-ascii path names
             mtime = int(mtime) * 1000  # TODO norm
-            if force_unicode:
+            if return_unicode:
                 if isinstance(filename, str):
                     # This is probably Windows
                     # Assume str, in locale encoding
@@ -423,7 +436,17 @@ def send_file_content(sender, filename, file_meta_data=None):
     return filecontents_len
 
 
-def receive_file_content(reader, filename, full_filename, full_filename_dir, mtime):
+def receive_file_content(reader, full_filename, mtime, file_safety=FILE_SAFETY_RENAME_AFTER_WRITE):
+    """
+        @reader - (buffered) socket to read from
+        @full_filename - expected to be a Unicode string
+        @mtime - file modification time
+        @file_safety - technique to use to protect existing files in case of error
+    """
+    if not SUPPORT_UNICODE_TYPE_FILENAME:
+        full_filename = full_filename.encode(SYSTEM_ENCODING)
+    full_filename_dir = os.path.dirname(full_filename)
+    # TODO? Android filename encoding hack?
     mtime = norm_mtime(mtime)
     mtime = unnorm_mtime(mtime)
     logger.debug('mtime: %r', mtime)
@@ -438,9 +461,10 @@ def receive_file_content(reader, filename, full_filename, full_filename_dir, mti
         compression_type = None
     filesize = int(filesize)
     logger.debug('filesize: %r', filesize)
-    logger.info('processing %r', ((filename, filesize, mtime),))  # TODO add option to supress this?
+    logger.info('processing %r', ((full_filename, filesize, mtime),))  # TODO add option to supress this?
 
-    # now read filesize bytes....
+    # Now buffer entire file contents
+    # if there is a network error existing files are left alone
     filecontents = reader.recv(filesize)
     logger.debug('filecontents: %r', filecontents)
 
@@ -451,10 +475,36 @@ def receive_file_content(reader, filename, full_filename, full_filename_dir, mti
 
     #if not exists full_filename_dir
     safe_mkdir(full_filename_dir)
+
+    safety_filename = None
+    if file_safety in (FILE_SAFETY_BACKUP, FILE_SAFETY_RENAME_AFTER_WRITE) and os.path.exists(full_filename):
+        # generate backup/temp filename
+        # NOTE FILE_SAFETY_RENAME_AFTER_WRITE really should make use of tempfile.*()
+        safety_filename = full_filename + '_skb'  # could include timestamp or even random tmp name, NOTE assumes no files end in '*_skb'!
+    else:
+        file_safety = FILE_SAFETY_NONE  # no file to backup so ensure no backup ops take place
+    if file_safety == FILE_SAFETY_BACKUP:
+            # rename existing file now as backup
+            if os.path.exists(safety_filename):
+                # Under Windows can not rename when destination already exists
+                os.remove(safety_filename)
+            os.rename(full_filename, safety_filename)
+    elif file_safety == FILE_SAFETY_RENAME_AFTER_WRITE:
+        if os.path.exists(safety_filename):
+            # Under Windows can not rename when destination already exists
+            os.remove(safety_filename)
+        full_filename, safety_filename = safety_filename, full_filename
+
     f = open(full_filename, 'wb')
     f.write(filecontents)
     f.close()
     set_utime(full_filename, (mtime, mtime))
+
+    if file_safety == FILE_SAFETY_RENAME_AFTER_WRITE:
+        # Under Windows can not rename when destination already exists
+        os.remove(safety_filename)
+        os.rename(full_filename, safety_filename)
+
     return len(filecontents)
 
 
@@ -472,12 +522,8 @@ def receive_files(reader, save_to_dir, filename_encoding):
         logger.debug('mtime: %r', mtime)
 
         full_filename = os.path.join(save_to_dir, filename)
-        full_filename_dir = os.path.dirname(full_filename)
-        # Not all platforms support Unicode file names (e.g. Python android)
-        full_filename = full_filename.encode(SYSTEM_ENCODING)
-        full_filename_dir = full_filename_dir.encode(SYSTEM_ENCODING)
 
-        read_len = receive_file_content(reader, filename, full_filename, full_filename_dir, mtime)  # really pass in full_filename_dir?
+        read_len = receive_file_content(reader, full_filename, mtime)
 
         received_file_count += 1
         byte_count_recv += read_len
@@ -655,6 +701,7 @@ class MyTCPHandler(SocketServer.BaseRequestHandler):
                 else:
                     logger.error('client requested path %r which is not in "server_dir_whitelist"', server_path)
                     raise NotAllowed('access to path %r' % server_path)
+        server_path = unicode(server_path)  # Ensure server directory is Unicode
 
         client_path = reader.next()
         logger.debug('client_path: %r', client_path)
@@ -715,42 +762,30 @@ class MyTCPHandler(SocketServer.BaseRequestHandler):
             byte_count_recv = received_file_count = 0
             missing_from_server = client_files_set.difference(server_files_set)
             for filename in missing_from_server:
-                try:
-                    logger.debug('File to get: %r', filename)
-                    mtime = client_files[filename]
-                    if os.path.sep == '\\':
-                        # Windows path conversion to Unix/protocol
-                        send_filename = filename.replace('\\', '/')
-                    else:
-                        send_filename = filename
-                    if isinstance(send_filename, str):
-                        # Assume str, in locale encoding
-                        send_filename = send_filename.decode(SYSTEM_ENCODING)
-                    if isinstance(send_filename, unicode):
-                        # Need to send binary/byte across wire
-                        send_filename = send_filename.encode(filename_encoding)
+                logger.debug('File to get: %r', filename)
+                mtime = client_files[filename]
+                if os.path.sep == '\\':
+                    # Windows path conversion to Unix/protocol
+                    send_filename = filename.replace('\\', '/')
+                else:
+                    send_filename = filename
+                if isinstance(send_filename, str):
+                    # Assume str, in locale encoding
+                    send_filename = send_filename.decode(SYSTEM_ENCODING)
+                if isinstance(send_filename, unicode):
+                    # Need to send binary/byte across wire
+                    send_filename = send_filename.encode(filename_encoding)
 
-                    file_details = '%s\n' % (send_filename, )
-                    logger.debug('file_details: %r', file_details)
-                    self.request.send(file_details)
+                file_details = '%s\n' % (send_filename, )
+                logger.debug('file_details: %r', file_details)
+                self.request.send(file_details)
 
-                    full_filename = os.path.join(server_path, filename)
-                    full_filename_dir = os.path.dirname(full_filename)
-                    # Not all platforms support Unicode file names (e.g. Python android)
-                    full_filename = full_filename.encode(SYSTEM_ENCODING)
-                    full_filename_dir = full_filename_dir.encode(SYSTEM_ENCODING)
+                full_filename = os.path.join(server_path, filename)
 
-                    byte_count_recv += receive_file_content(reader, filename, full_filename, full_filename_dir, mtime)
-                    received_file_count += 1
-                    #logger.info('%r bytes in %d files sent by client in %s', byte_count_recv, received_file_count, timer_details)  # FIXME timer?
-                    logger.info('%r bytes in %d files sent by client', byte_count_recv, received_file_count)  # FIXME timer?
-
-                    #assert data_len == len(data)
-                except UnicodeEncodeError:
-                    # Skip this file
-                    logger.error('Encoding error - unable to access and process %r, ignoring', filename)
-                    skip_count += 1
-                    continue
+                byte_count_recv += receive_file_content(reader, full_filename, mtime)
+                received_file_count += 1
+                #logger.info('%r bytes in %d files sent by client in %s', byte_count_recv, received_file_count, timer_details)  # FIXME timer?
+                logger.info('%r bytes in %d files sent by client', byte_count_recv, received_file_count)  # FIXME timer?
 
         # we're done receiving data from client now
         self.request.send('\n')
@@ -800,6 +835,10 @@ class MyTCPHandler(SocketServer.BaseRequestHandler):
         else:
             skip_count_str = ''
         logger.info('Successfully checked %r, sent %r bytes in %r%s files in %s', len(server_files), byte_count_sent, sent_count, skip_count_str, sync_timer)
+        if skip_count:
+            # extra emphasis in log
+            logger.warn('Skipped %d files.', skip_count)
+            logger.info('Skipped files can be avoided if sksync1_compat is disabled.')
         logger.info('Client %r disconnected', self.request.getpeername())
 
 
@@ -935,13 +974,21 @@ def client_start_sync(ip, port, server_path, client_path, sync_type=SKSYNC_PROTO
 
     logger.info('filename_encoding %r', filename_encoding)
     logger.info('determining client files for %r', real_client_path)
-    file_list = get_file_listings(real_client_path, recursive=recursive)
+    if SUPPORT_UNICODE_TYPE_FILENAME:
+        force_unicode = True
+    else:
+        force_unicode = False
+    file_list = get_file_listings(real_client_path, recursive=recursive, force_unicode=force_unicode)
     file_list_info = []
+    skip_count = 0
     for filename, mtime in file_list:
         try:
             if isinstance(filename, str):
                 # Assume str, in locale encoding
                 filename = filename.decode(SYSTEM_ENCODING)
+            # Check filename allowed in transport encoding, for backwards compat
+            # for utf-8 over the wire (i.e. not using Original SK Server/client)
+            # this check is not needed
             if isinstance(filename, unicode):
                 # Need to send binary/byte across wire
                 filename = filename.encode(filename_encoding)
@@ -950,6 +997,7 @@ def client_start_sync(ip, port, server_path, client_path, sync_type=SKSYNC_PROTO
         except UnicodeEncodeError:
             # Skip this file
             logger.error('Encoding error - unable to access and process %r, ignoring', filename)
+            skip_count += 1
             # TODO log summary of skipped files at end
             continue
     logger.info('Number of files on client %d', len(file_list))
@@ -957,7 +1005,7 @@ def client_start_sync(ip, port, server_path, client_path, sync_type=SKSYNC_PROTO
     delta = len(file_list) - len(file_list_info)
     if delta != 0:
         logger.info('Skiping %d', delta)
-    file_list_str = '\n'.join(file_list_info)
+    file_list_str = '\n'.join(file_list_info)  # this is bytes
 
     # Connect to the server
     logger.info('client connecting to server %s:%d', ip, port)
@@ -1182,8 +1230,10 @@ def client_start_sync(ip, port, server_path, client_path, sync_type=SKSYNC_PROTO
     s.close()
     sync_timer.stop()
     logger.info('%r bytes in %d files sent by server in %s', byte_count_recv, received_file_count, sync_timer)
-    if delta != 0:
-        logger.info('Skipped %d', delta)
+    if skip_count or delta:
+        # extra emphasis in log
+        logger.warn('Skipped %d files (delta %d).', skip_count, delta)
+        logger.info('Skipped files can be avoided if sksync1_compat is disabled.')
     logger.info('disconnected')
 
 
@@ -1198,6 +1248,9 @@ def run_client(config, config_name='client'):
     client_config = config['clients'][config_name]
     server_path, client_path = client_config['server_path'], client_config['client_path']
     host, port = client_config.get('host', host), client_config.get('port', port)
+    client_sksync1_compat = client_config.get('sksync1_compat') 
+    if client_sksync1_compat is not None:
+        sksync1_compat = client_sksync1_compat
     recursive = client_config.get('recursive')
     sync_type = client_config.get('sync_type', SKSYNC_PROTOCOL_TYPE_FROM_SERVER_USE_TIME)  # TODO not user friendly...
 

@@ -47,7 +47,13 @@ Sample config that limits the paths that clients can sync with:
         "server_dir_whitelist_policy": "silent",
         "ignore_time_errors": false,
         "clients": {
-            "client": {
+            "client1": {
+                "recursive": true,
+                "server_path": "/tmp/server/path",
+                "client_path": "/tmp/client/path"
+            },
+            "client2": {
+                "sksync1_compat": false,
                 "recursive": true,
                 "server_path": "/tmp/server/path",
                 "client_path": "/tmp/client/path"
@@ -68,6 +74,9 @@ server will not share all disks and directories.
 If "ignore_time_errors" is true, errors relating to setting files
 modification times will be ignored. This is useful on a number
 of Android devices.
+
+In the client2 example above the client will NOT attempt to be compatible
+with the original SK Sync.
 
 NOTE both the server "host" address and and "port" can be specified in
 the "client" section.

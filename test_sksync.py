@@ -40,8 +40,19 @@ test_fixtures_latin1 = {
     u'testC.txt': (1345316082.71875 - 72, '4'),
 }
 
+# Asia
+test_fixtures_asia = {
+    u'test\u9152.txt': (1345316082.71875 - 12, '2'),  # Unicode Han Character 'wine, spirits, liquor, alcoholic beverage
+    u'testB.txt': (1345316082.71875 - 72, '3'),
+    u'testC.txt': (1345316082.71875 - 72, '4'),
+}
+
 
 def safe_rmtree(testdir):
+    """Windows fails to delete filenames with characters not in locale
+    if directory name was not encoded in Unicode to begin with
+    even if directory name s 7 bit clean ASCII!"""
+    testdir = unicode(testdir)
     if '*' in testdir:
         raise ValueError('directory name %r appears to contain wildcard' % testdir)
     try:
@@ -394,6 +405,11 @@ class TestSKSyncWhitelistFail(TestSKSync):
 
 class TestSKSyncLatin1Files(TestSKSync):
     def setUp(self, test_fixtures=test_fixtures_latin1):
+        GenericSetup.setUp(self, test_fixtures)
+
+
+class TestSKSyncAsiaFiles(TestSKSync):
+    def setUp(self, test_fixtures=test_fixtures_asia):
         GenericSetup.setUp(self, test_fixtures)
 
 
