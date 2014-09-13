@@ -675,6 +675,7 @@ class MyTCPHandler(SocketServer.BaseRequestHandler):
         assert response in (SKSYNC_PROTOCOL_01, PYSKSYNC_PROTOCOL_01, PYSKSYNC_PROTOCOL_02), 'unexpected protocol, %r' % (response,)
         sync_protocol = response
         session_info['protocol'] = sync_protocol
+        logger.info('sync_protocol %r', sync_protocol)
         if sync_protocol == SKSYNC_PROTOCOL_01:
             filename_encoding = FILENAME_ENCODING
         else:
