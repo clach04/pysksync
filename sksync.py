@@ -490,6 +490,22 @@ def receive_files(reader, save_to_dir, filename_encoding):
         logger.debug('Received: %r', response)
     return byte_count_recv, received_file_count
 
+def filename2wireformat(session_info, filename):
+    filename_encoding = session_info['filename_encoding']
+    if os.path.sep == '\\':
+        # Windows path conversion to Unix/protocol
+        send_filename = filename.replace('\\', '/')
+    else:
+        send_filename = filename
+    if isinstance(send_filename, str):
+        # Assume str, in locale encoding
+        send_filename = send_filename.decode(SYSTEM_ENCODING)
+    if isinstance(send_filename, unicode):
+        # Need to send binary/byte across wire
+        send_filename = send_filename.encode(filename_encoding)
+    return send_filename
+
+
 class MyTCPHandler(SocketServer.BaseRequestHandler):
     """
     The RequestHandler class for our server.
@@ -729,18 +745,7 @@ class MyTCPHandler(SocketServer.BaseRequestHandler):
             for filename in missing_from_server:
                 logger.debug('File to get: %r', filename)
                 mtime = client_files[filename]
-                if os.path.sep == '\\':
-                    # Windows path conversion to Unix/protocol
-                    send_filename = filename.replace('\\', '/')
-                else:
-                    send_filename = filename
-                if isinstance(send_filename, str):
-                    # Assume str, in locale encoding
-                    send_filename = send_filename.decode(SYSTEM_ENCODING)
-                if isinstance(send_filename, unicode):
-                    # Need to send binary/byte across wire
-                    send_filename = send_filename.encode(filename_encoding)
-
+                send_filename = filename2wireformat(session_info, filename)
                 file_details = '%s\n' % (send_filename, )
                 logger.debug('file_details: %r', file_details)
                 self.request.send(file_details)
@@ -769,18 +774,7 @@ class MyTCPHandler(SocketServer.BaseRequestHandler):
                     try:
                         logger.debug('File to send: %r', filename)
                         mtime, data_len = server_files[filename]
-                        if os.path.sep == '\\':
-                            # Windows path conversion to Unix/protocol
-                            send_filename = filename.replace('\\', '/')
-                        else:
-                            send_filename = filename
-                        if isinstance(send_filename, str):
-                            # Assume str, in locale encoding
-                            send_filename = send_filename.decode(SYSTEM_ENCODING)
-                        if isinstance(send_filename, unicode):
-                            # Need to send binary/byte across wire
-                            send_filename = send_filename.encode(filename_encoding)
-
+                        send_filename = filename2wireformat(session_info, filename)
                         file_len = send_file_content(self.request, filename, file_meta_data=(send_filename, mtime, data_len))
                         sent_count += 1
                         byte_count_sent += file_len
