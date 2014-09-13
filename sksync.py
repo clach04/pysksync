@@ -388,9 +388,11 @@ def send_file_content(sender, filename, file_meta_data=None):
 
     if file_meta_data is not None:
         assert data_len == filecontents_len
-        message = '%s\n%d\n%d\n' % (send_filename, mtime, data_len)
-    else:
-        message = '%d\n' % filecontents_len
+        message = '%s\n%d\n' % (send_filename, mtime)
+        len_sent = sender.send(message)
+        logger.debug('sent: len %d %r', len_sent, message)
+
+    message = '%d\n' % filecontents_len
     len_sent = sender.send(message)
     logger.debug('sent: len %d %r', len_sent, message)
 
