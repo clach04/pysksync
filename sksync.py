@@ -609,14 +609,18 @@ class MyTCPHandler(SocketServer.BaseRequestHandler):
                 else:
                     return
 
+        session_info = {}
         # Start of SKSYNC PROTOCOL 01
         assert response in (SKSYNC_PROTOCOL_01, PYSKSYNC_PROTOCOL_01), 'unexpected protocol, %r' % (response,)
+        sync_protocol = response
+        session_info['protocol'] = sync_protocol
         # PYSKSYNC_PROTOCOL_01 is the same as SKSYNC_PROTOCOL_01 but using UTF-8 for filenames
-        if response == SKSYNC_PROTOCOL_01:
+        if sync_protocol == SKSYNC_PROTOCOL_01:
             filename_encoding = FILENAME_ENCODING
-        elif response == PYSKSYNC_PROTOCOL_01:
+        elif sync_protocol == PYSKSYNC_PROTOCOL_01:
             filename_encoding = PYSKSYNC_FILENAME_ENCODING
         logger.info('filename_encoding %r', filename_encoding)
+        session_info['filename_encoding'] = filename_encoding
 
         message = SKSYNC_PROTOCOL_ESTABLISHED
         len_sent = self.request.send(message)
@@ -627,6 +631,7 @@ class MyTCPHandler(SocketServer.BaseRequestHandler):
         assert response in (SKSYNC_PROTOCOL_TYPE_FROM_SERVER_USE_TIME, SKSYNC_PROTOCOL_TYPE_TO_SERVER_USE_TIME, SKSYNC_PROTOCOL_TYPE_BIDIRECTIONAL_USE_TIME), repr(response)  # type of sync
         # FROM SERVER appears to use the same protocol, the difference is in the server logic for working out which files to send to the client
         sync_type = response
+        session_info['sync_type'] = sync_type
 
         response = reader.next()
         logger.debug('Received: %r', response)
@@ -637,7 +642,8 @@ class MyTCPHandler(SocketServer.BaseRequestHandler):
         else:
             # SKSYNC_PROTOCOL_RECURSIVE
             recursive = True
-        
+        session_info['recursive'] = recursive
+
         server_path = reader.next()
         logger.debug('server_path: %r', server_path)
         server_path = server_path[:-1]  # loose trailing \n
@@ -659,9 +665,11 @@ class MyTCPHandler(SocketServer.BaseRequestHandler):
                     logger.error('client requested path %r which is not in "server_dir_whitelist"', server_path)
                     raise NotAllowed('access to path %r' % server_path)
         server_path = unicode(server_path)  # Ensure server directory is Unicode
+        session_info['server_path'] = server_path
 
         client_path = reader.next()
         logger.debug('client_path: %r', client_path)
+        session_info['client_path'] = client_path
 
         # possible first file details
         response = reader.next()
