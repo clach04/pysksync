@@ -394,7 +394,7 @@ def send_file_content(sender, filename, file_meta_data=None):
     """Sends file, on the wite payload:
             full_path_filename\n  OPTIONAL
             mtime\n     OPTIONAL
-            byte_length\n
+            byte_length\n | compression_type compressed_byte_length\n
             bytes of byte_length above
     """
     if file_meta_data:
@@ -418,7 +418,8 @@ def send_file_content(sender, filename, file_meta_data=None):
     if compression_type:
         compression_func = compression_lookup[compression_type]['compress']
         # TODO compression_type.split('-') to determine parameters, e.g. compression level
-        # one shot (in memory, like file IO) compress
+        # one shot (in memory, the same way file IO is done in one) compress
+        # compressed size is then sent ahead of time so reader know how much is coming
         compressed_filecontents = compression_func(filecontents)  # TODO compression level/parameters
         compressed_data_len = len(compressed_filecontents)
         if filecontents_len <= compressed_data_len:
