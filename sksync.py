@@ -378,6 +378,12 @@ def get_file_listings(path_of_files, recursive=False, include_size=False, return
 
 
 def send_file_content(sender, filename, file_meta_data=None):
+    """Sends file, on the wite payload:
+            full_path_filename\n  OPTIONAL
+            mtime\n     OPTIONAL
+            byte_length\n
+            bytes of byte_length above
+    """
     if file_meta_data:
         send_filename, mtime, data_len = file_meta_data
 
