@@ -418,13 +418,12 @@ def send_file_content(sender, filename, file_meta_data=None):
         if filecontents_len <= compressed_data_len:
             compression_type = None
         else:
-            data_len_str = '%s %d' % (compression_type, compressed_data_len,)
             filecontents = compressed_filecontents
 
-    if compression_type is None:
-        data_len_str = '%d' % (filecontents_len,)
-
-    message = '%s\n' % data_len_str
+    if compression_type:
+        message = '%s %d\n' % (compression_type, compressed_data_len,)
+    else:
+        message = '%d\n' % filecontents_len
     len_sent = sender.send(message)
     logger.debug('sent: len %d %r', len_sent, message)
 
