@@ -939,6 +939,12 @@ def run_server(config):
     host, port = config['host'], config['port']
 
     logger.info('starting server: %r', (host, port))
+    if host == '0.0.0.0':
+        # determine actual IP address
+        local_ip = socket.gethostbyname(socket.gethostname())
+        if not local_ip or local_ip == '127.0.1.1':
+            local_ip = socket.gethostbyname(socket.getfqdn())
+        logger.info('starting server: %r', (local_ip, port))
 
     # Create the server, binding to localhost on port 9999
     server = MyTCPServer((host, port), MyTCPHandler)
