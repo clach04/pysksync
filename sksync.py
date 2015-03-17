@@ -1357,7 +1357,8 @@ def easydialogs_gui(config):
                 config_name = client_1
             elif client_result == easydialogs_no:
                 config_name = client_2
-            run_client(config, config_name=config_name)
+            if client_result != easydialogs_cancel:
+                run_client(config, config_name=config_name)
 
 
 def main(argv=None):
