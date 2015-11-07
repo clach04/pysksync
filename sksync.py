@@ -971,6 +971,7 @@ def run_server(config):
                 '',
             ]),
             'process_func': upnp_ssdp.ssdp_server_processor_sample,  # or print_all()
+            'respond_to_wildcard': False,  # Only respond to search for explict service name
 
             # template values
             'service_name': SKSYNC_SSDP_SERVICE_NAME,
