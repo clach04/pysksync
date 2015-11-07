@@ -261,7 +261,8 @@ class StoppableThread(threading.Thread):
 class MySsdpThreadServer(StoppableThread):
     def run(self):
         logger = logging.getLogger("ssdp_server")
-        logger.setLevel(logging.DEBUG)  # DEBUG
+        logger.setLevel(logging.INFO)
+        #logger.setLevel(logging.DEBUG)  # DEBUG
 
         settings = self._settings
         process_func = settings['process_func']
@@ -368,7 +369,7 @@ def ssdp_server_processor_sample(sock, client_addr, header_dict, settings):
         for x in ('host_ip', 'host_port', 'uuid', 'hostname', 'server_type', 'service_name'):
             ssdp_values[x] = settings[x]
         msg = settings['SSDP_RESPONSE_STRING'] % ssdp_values
-        logger.debug("SSDP response to send: %r", msg)
+        logger.info("SSDP response to %r, send: %r", client_addr, msg)
         sock.sendto(msg, client_addr)
 
 def demo_service_threaded():
