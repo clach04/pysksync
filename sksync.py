@@ -14,6 +14,7 @@ import SocketServer
 import threading
 import select
 import logging
+import platform
 import glob
 import errno
 import binascii
@@ -101,6 +102,7 @@ try:
 except ImportError:
     srp = fake_module('srp')
 
+import upnp_ssdp
 
 PYSKSYNC_FILENAME_ENCODING = 'UTF-8'
 FILENAME_ENCODING = 'cp1252'  # latin1 encoding used by sksync 1
@@ -950,9 +952,45 @@ def run_server(config):
     server = MyTCPServer((host, port), MyTCPHandler)
     server.sksync_config = config
 
-    # Activate the server; this will keep running until you
-    # interrupt the program with Ctrl-C
-    server.serve_forever()
+    if config['ssdp_advertise']:
+        ssdp_settings = {
+            'SSDP_RESPONSE_STRING': "\r\n".join([  # fragile but easy % style
+                'HTTP/1.1 200 OK',
+                'Cache-Control:max-age=900',
+                'Host:239.255.255.250:1900',  # this may be incorrect on a unicast discover request
+                'Location:%(host_ip)s:%(host_port)d',
+                'ST:upnp:rootdevice',
+                'NT:upnp:rootdevice',
+                'USN:uuid:%(uuid)s::upnp:rootdevice',
+                'NTS:ssdp:alive',
+                'SERVER:%(server_type)s UPnP/1.1 pysksync (%(hostname)s)/1.0',  # limit server_type to 31 bytes
+
+                '',
+                '',
+            ]),
+            'process_func': upnp_ssdp.ssdp_server_processor_sample,  # or print_all()
+
+            # template values
+            'host_ip': local_ip,
+            'host_port': port,
+            'uuid': '00000000-0000-0000-0000-000000000000',  # uuid.uuid4(),  # will change on each run....
+            'hostname': platform.node(),
+            'server_type': platform.platform(),
+        }
+        ssdp_server = upnp_ssdp.MySsdpThreadServer()
+        ssdp_server._settings = ssdp_settings
+        ssdp_server.start()
+    else:
+        ssdp_server = None
+
+    try:
+        # Activate the server; this will keep running until you
+        # interrupt the program with Ctrl-C
+        server.serve_forever()
+    finally:
+        if ssdp_server:
+            ssdp_server.stop()
+            ssdp_server.join()  # wait for it to stop
 
 
 def client_start_sync(ip, port, server_path, client_path, sync_type=SKSYNC_PROTOCOL_TYPE_FROM_SERVER_USE_TIME, recursive=False, use_ssl=None, ssl_server_certfile=None, ssl_client_certfile=None, ssl_client_keyfile=None, sksync1_compat=False, raise_errors=True, username=None, password=None):
@@ -1315,6 +1353,7 @@ def set_default_config(config):
     config['server_dir_whitelist_policy'] = config.get('server_dir_whitelist_policy', 'deny')
     config['users'] = config.get('users', {})
     config['raise_errors'] = config.get('raise_errors', True)
+    config['ssdp_advertise'] = config.get('ssdp_advertise', True)
     return config
 
 
@@ -1358,6 +1397,15 @@ def easydialogs_gui(config):
             elif client_result == easydialogs_no:
                 config_name = client_2
             if client_result != easydialogs_cancel:
+                """
+                print config
+                print config['clients']
+                print config['clients'][config_name]
+                client_config = config['clients'][config_name]
+                print client_config
+                print client_config['host']
+                print client_config['port']
+                """
                 run_client(config, config_name=config_name)
 
 
@@ -1389,6 +1437,22 @@ def main(argv=None):
     elif 'client' in argv:
         config_name = argv[-1]
         run_client(config, config_name=config_name)
+    elif 'scan' in argv:
+        # SSDP discovery scan
+        host = port = None
+        # Attempt discovery
+        services = upnp_ssdp.ssdp_discover(service_name='urn:schemas-upnp-org:service:pilight:1', process_func=upnp_ssdp.simple_http_headers_processor)
+        #from pprint import pprint ; pprint(services)
+        for location in services:
+            try:
+                host, port = location.split(':')
+                port = int(port)
+            except ValueError:
+                    pass
+            if host and port:
+                break
+
+        print host, port
     else:
         run_server(config)
     
