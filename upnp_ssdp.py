@@ -356,7 +356,7 @@ def ssdp_server_processor_sample(sock, client_addr, header_dict, settings):
 
     respond_to_wildcard = settings.get('respond_to_wildcard', True)
     logger = logging.getLogger("ssdp_server")
-    service_name = 'urn:schemas-upnp-org:service:pilight:1'
+    service_name = settings['service_name']
     st = header_dict['st']
     service_name_match = False
     if respond_to_wildcard and (st == 'ssdp:all' or st == 'upnp:rootdevice'):
@@ -365,7 +365,7 @@ def ssdp_server_processor_sample(sock, client_addr, header_dict, settings):
         service_name_match = True
     if service_name_match:
         ssdp_values = {}
-        for x in ('host_ip', 'host_port', 'uuid', 'hostname', 'server_type'):
+        for x in ('host_ip', 'host_port', 'uuid', 'hostname', 'server_type', 'service_name'):
             ssdp_values[x] = settings[x]
         msg = settings['SSDP_RESPONSE_STRING'] % ssdp_values
         logger.debug("SSDP response to send: %r", msg)
@@ -379,7 +379,7 @@ def demo_service_threaded():
             'Cache-Control:max-age=900',
             'Host:239.255.255.250:1900',  # this may be incorrect on a unicast discover request
             'Location:%(host_ip)s:%(host_port)d',
-            'ST:upnp:rootdevice',
+            'ST:%(service_name)s',
             'NT:upnp:rootdevice',
             'USN:uuid:%(uuid)s::upnp:rootdevice',
             'NTS:ssdp:alive',
@@ -391,6 +391,7 @@ def demo_service_threaded():
         'process_func': ssdp_server_processor_sample,  # or print_all()
 
         # template values
+        'service_name': 'urn:schemas-upnp-org:service:pilight:1',
         'host_ip': determine_local_ipaddr(),
         'host_port': 1234,
         'uuid': '00000000-0000-0000-0000-000000000000',  # uuid.uuid4()

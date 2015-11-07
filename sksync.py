@@ -926,6 +926,8 @@ class MyThreadedTCPServer(SocketServer.ThreadingMixIn, MyTCPServer):
     pass
 
 
+SKSYNC_SSDP_SERVICE_NAME = 'urn:schemas-upnp-org:service:sksync:1'
+
 def run_server(config):
     """Implements SK Server, currently only supports:
        * direction =  "from server (use time)" ONLY
@@ -959,7 +961,7 @@ def run_server(config):
                 'Cache-Control:max-age=900',
                 'Host:239.255.255.250:1900',  # this may be incorrect on a unicast discover request
                 'Location:%(host_ip)s:%(host_port)d',
-                'ST:upnp:rootdevice',
+                'ST:%(service_name)s',
                 'NT:upnp:rootdevice',
                 'USN:uuid:%(uuid)s::upnp:rootdevice',
                 'NTS:ssdp:alive',
@@ -971,6 +973,7 @@ def run_server(config):
             'process_func': upnp_ssdp.ssdp_server_processor_sample,  # or print_all()
 
             # template values
+            'service_name': SKSYNC_SSDP_SERVICE_NAME,
             'host_ip': local_ip,
             'host_port': port,
             'uuid': '00000000-0000-0000-0000-000000000000',  # uuid.uuid4(),  # will change on each run....
@@ -1441,7 +1444,7 @@ def main(argv=None):
         # SSDP discovery scan
         host = port = None
         # Attempt discovery
-        services = upnp_ssdp.ssdp_discover(service_name='urn:schemas-upnp-org:service:pilight:1', process_func=upnp_ssdp.simple_http_headers_processor)
+        services = upnp_ssdp.ssdp_discover(service_name=SKSYNC_SSDP_SERVICE_NAME, process_func=upnp_ssdp.simple_http_headers_processor)
         #from pprint import pprint ; pprint(services)
         for location in services:
             try:
