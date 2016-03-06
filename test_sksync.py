@@ -393,6 +393,56 @@ class TestSKSync(GenericSetup):
         self.check_file_contents_and_mtime(sub_test_dir, self.TEST_FILENAME_3)
         # TODO check no other files exist in self.client_dir
 
+    def test_sync_from_server_with_times_to_nonempty_client_directory_client_newer_and_server_newer(self):
+        # based on TestSKSync.test_sync_from_server_with_times_to_nonempty_client_directory_client_newer()
+        # Update both client and server and ensure correct sync happens
+
+        # setup client dir and server dir with same files
+        create_test_files(self.test_fixtures, testdir=self.client_dir)
+        local_client_test_fixtures = copy.deepcopy(self.test_fixtures)
+        local_server_test_fixtures = copy.deepcopy(local_client_test_fixtures)
+        canon_filenames = list(local_client_test_fixtures.keys())
+        canon_filenames.sort()
+        #import pdb ; pdb.set_trace()
+
+        # update single client file
+        test_string = 'client updated'
+        filename = canon_filenames[0]  # 'test1.txt'
+        local_client_test_fixtures[filename] = (local_client_test_fixtures[filename][0], test_string)
+        self.assertTrue(os.path.isfile(os.path.join(self.server_dir, filename)))
+        tmp_client_file = os.path.join(self.client_dir, filename)
+        f = open(tmp_client_file, 'wb')
+        f.write(test_string)
+        f.close()  # assume mtime is ahead of fixtures mtimes
+        self.assertTrue(os.path.isfile(tmp_client_file))
+        self.check_file_contents_and_mtime(self.server_dir, filename)
+
+        # update single server file
+        test_string = 'server updated'
+        filename = canon_filenames[1]  # 'test2.txt'
+        local_server_test_fixtures[filename] = (local_server_test_fixtures[filename][0], test_string)
+        local_client_test_fixtures[filename] = local_server_test_fixtures[filename]
+        self.assertTrue(os.path.isfile(os.path.join(self.client_dir, filename)))
+        tmp_client_file = os.path.join(self.server_dir, filename)
+        f = open(tmp_client_file, 'wb')
+        f.write(test_string)
+        f.close()  # assume mtime is ahead of fixtures mtimes
+        self.assertTrue(os.path.isfile(tmp_client_file))
+        self.check_file_contents_and_mtime(self.client_dir, filename)
+
+        # do sync
+        self.perform_sync(self.server_dir, self.client_dir, config=self.config)
+
+        # check files exist and match
+        for filename in local_server_test_fixtures:
+            # NOTE assumes local_server_test_fixtures and local_client_test_fixtures have same filenames
+            self.assertTrue(os.path.isfile(os.path.join(self.server_dir, filename)))
+            self.assertTrue(os.path.isfile(os.path.join(self.client_dir, filename)))
+            self.check_file_contents_and_mtime(self.server_dir, filename, test_fixtures=local_server_test_fixtures, skip_time_time_check=True)
+            self.check_file_contents_and_mtime(self.client_dir, filename, test_fixtures=local_client_test_fixtures, skip_time_time_check=True)
+        # TODO check no other files exist in self.client_dir and self.server_dir
+        #import pdb ; pdb.set_trace()  # DEBUG
+
 
 class TestSKSyncUnicodeType7bitFilenames(TestSKSync):
     # Uses 7 bit ascii filenames, but we use unicode in the fixture
@@ -506,8 +556,12 @@ class TestSKSyncBiDirectionalUseTime(TestSKSync):
         finally:
             server.shutdown()
 
+    def test_sync_from_server_with_times_to_nonempty_client_directory_client_newer_and_server_newer(self):
+        pass  # See test_sync_from_server_with_times_to_nonempty_client_directory_client_newer
+        # BiDirectional sync will update both client and server which TestSKSync.test_sync_from_server_with_times_to_nonempty_client_directory_client_newer_and_server_newer() is not expecting.
+
     def test_sync_from_server_with_times_to_nonempty_client_directory_client_newer(self):
-        # based on test_sync_from_server_with_times_to_nonempty_client_directory_client_newer()
+        # based on TestSKSync.test_sync_from_server_with_times_to_nonempty_client_directory_client_newer()
         # Update both client and server and ensure sync happens both ways
 
         # setup client dir and server dir with same files
