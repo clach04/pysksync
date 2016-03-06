@@ -2,6 +2,7 @@
 # -*- coding: us-ascii -*-
 # vim:ts=4:sw=4:softtabstop=4:smarttab:expandtab
 
+import copy
 import os
 import sys
 import string
@@ -73,7 +74,7 @@ def get_random_port():
     return host_port
 
 
-def check_file_contents_and_mtime(pathname, filename, test_fixtures):
+def check_file_contents_and_mtime(pathname, filename, test_fixtures, skip_time_time_check=SKIP_TIME_TIME_CHECK):
     """pathname can be empty string
     """
     canon_mtime, canon_data = test_fixtures[filename]
@@ -82,8 +83,8 @@ def check_file_contents_and_mtime(pathname, filename, test_fixtures):
     f = open(filename)
     data = f.read()
     f.close()
-    assert canon_data == data  # , ' %r != %r' % (canon_data, data)
-    if not SKIP_TIME_TIME_CHECK:
+    assert canon_data == data, 'for %r; canon %r != results %r' % (filename, canon_data, data)
+    if not skip_time_time_check:
         assert abs(canon_mtime - x.st_mtime) <= 1, 'canon_mtime mismatch x.st_mtime: %r' % ((canon_mtime, x.st_mtime),)  # with in 1 second
 
 
@@ -132,7 +133,7 @@ def perform_sync(server_dir, client_dir, HOST='127.0.0.1', PORT=get_random_port(
         server_thread.daemon = True
         server_thread.start()
         #print "Server loop running in thread:", server_thread.name
-        
+
         # do sync
         sksync.run_client(config, config_name='testing')
     finally:
@@ -198,8 +199,10 @@ class GenericSetup(unittest.TestCase):
             tmp_filename = 'TEST_FILENAME_%d' % (i + 1,)
             setattr(self, tmp_filename, test_filenames[i])
 
-    def check_file_contents_and_mtime(self, pathname, filename):
-        check_file_contents_and_mtime(pathname, filename, self.test_fixtures)
+    def check_file_contents_and_mtime(self, pathname, filename, test_fixtures=None, skip_time_time_check=SKIP_TIME_TIME_CHECK):
+        if test_fixtures is None:
+            test_fixtures = self.test_fixtures
+        check_file_contents_and_mtime(pathname, filename, test_fixtures, skip_time_time_check)
 
 
     def perform_sync(self, server_dir, client_dir, HOST='127.0.0.1', PORT=get_random_port(), recursive=False, config=None):
@@ -308,7 +311,10 @@ class TestSKSync(GenericSetup):
             f.close()
             assert test_string 
             self.assertEqual(test_string, data, 'server clobbered client file %r' % filename)
+            self.check_file_contents_and_mtime(self.server_dir, filename)
+            #self.check_file_contents_and_mtime(self.client_dir, filename)
         # TODO check no other files exist in self.client_dir
+        #import pdb ; pdb.set_trace()  # DEBUG
 
     def test_sync_from_server_with_times_to_nonempty_client_directory_client_same_timestamps(self):
         test_string = 'NEVER_INCLUDE_THIS_STRING_IN_TESTS'
@@ -449,11 +455,101 @@ class TestSKSyncClientPush(TestSKSync):
             server_thread.daemon = True
             server_thread.start()
             #print "Server loop running in thread:", server_thread.name
-            
+
             # do sync
             sksync.run_client(config, config_name='testing')
         finally:
             server.shutdown()
+
+
+class TestSKSyncBiDirectionalUseTime(TestSKSync):
+    def setUp(self, test_fixtures=test_fixtures_us_ascii, server_dir=os.path.join('tmp_testsuitedir', 'server'), client_dir=os.path.join('tmp_testsuitedir', 'client')):
+        #def setUp(self, test_fixtures=test_fixtures_us_ascii, server_dir=os.path.join('tmp_testsuitedir', 'client'), client_dir=os.path.join('tmp_testsuitedir', 'server')):
+        # NOTE switch client and server directory
+        GenericSetup.setUp(self, test_fixtures, server_dir=server_dir, client_dir=client_dir)
+
+    def perform_sync(self, server_dir, client_dir, HOST='127.0.0.1', PORT=get_random_port(), recursive=False, config=None):
+        config = config or {}
+        config['host'] = HOST
+        config['port'] = PORT
+        config['require_auth'] = config.get('require_auth', False)
+        #config['server_path'] = server_dir
+        #config['client_path'] = client_dir
+        config['clients'] = config.get('clients', {})
+        config['clients']['testing'] = {}
+
+        #config['clients']['testing']['server_path'] = client_dir  # NOTE switch client/server directory
+        #config['clients']['testing']['client_path'] = server_dir  # NOTE switch client/server directory
+        config['clients']['testing']['server_path'] = server_dir
+        config['clients']['testing']['client_path'] = client_dir
+
+        config['clients']['testing']['recursive'] = recursive
+        config['clients']['testing']['sync_type'] = sksync.SKSYNC_PROTOCOL_TYPE_BIDIRECTIONAL_USE_TIME
+        config = sksync.set_default_config(config)
+
+        # Start sync server in thread
+        server = sksync.MyThreadedTCPServer((HOST, PORT), sksync.MyTCPHandler)
+        try:
+            host, port = server.server_address
+            server.sksync_config = config
+
+            # Start a thread with the server, in turn that thread will then start additional threads
+            # One additional thread for each client request/connection
+            server_thread = threading.Thread(target=server.serve_forever)
+            # Exit the server thread when the main thread terminates
+            server_thread.daemon = True
+            server_thread.start()
+            #print "Server loop running in thread:", server_thread.name
+
+            # do sync
+            sksync.run_client(config, config_name='testing')
+        finally:
+            server.shutdown()
+
+    def test_sync_from_server_with_times_to_nonempty_client_directory_client_newer(self):
+        # based on test_sync_from_server_with_times_to_nonempty_client_directory_client_newer()
+        # Update both client and server and ensure sync happens both ways
+
+        # setup client dir and server dir with same files
+        create_test_files(self.test_fixtures, testdir=self.client_dir)
+        local_test_fixtures = copy.deepcopy(self.test_fixtures)
+        #import pdb ; pdb.set_trace()
+
+        # update single client file
+        test_string = 'client updated'
+        filename = 'test1.txt'
+        local_test_fixtures[filename] = (local_test_fixtures[filename][0], test_string)
+        self.assertTrue(os.path.isfile(os.path.join(self.server_dir, filename)))
+        tmp_client_file = os.path.join(self.client_dir, filename)
+        f = open(tmp_client_file, 'wb')
+        f.write(test_string)
+        f.close()  # assume mtime is ahead of fixtures mtimes
+        self.assertTrue(os.path.isfile(tmp_client_file))
+        self.check_file_contents_and_mtime(self.server_dir, filename)
+
+        # update single server file
+        test_string = 'server updated'
+        filename = 'test2.txt'
+        local_test_fixtures[filename] = (local_test_fixtures[filename][0], test_string)
+        self.assertTrue(os.path.isfile(os.path.join(self.client_dir, filename)))
+        tmp_client_file = os.path.join(self.server_dir, filename)
+        f = open(tmp_client_file, 'wb')
+        f.write(test_string)
+        f.close()  # assume mtime is ahead of fixtures mtimes
+        self.assertTrue(os.path.isfile(tmp_client_file))
+        self.check_file_contents_and_mtime(self.client_dir, filename)
+
+        # do sync
+        self.perform_sync(self.server_dir, self.client_dir, config=self.config)
+
+        # check files exist and match
+        for filename in local_test_fixtures:
+            self.assertTrue(os.path.isfile(os.path.join(self.server_dir, filename)))
+            self.assertTrue(os.path.isfile(os.path.join(self.client_dir, filename)))
+            self.check_file_contents_and_mtime(self.server_dir, filename, test_fixtures=local_test_fixtures, skip_time_time_check=True)
+            self.check_file_contents_and_mtime(self.client_dir, filename, test_fixtures=local_test_fixtures, skip_time_time_check=True)
+        # TODO check no other files exist in self.client_dir and self.server_dir
+        #import pdb ; pdb.set_trace()  # DEBUG
 
 
 class TestSKSyncWithSSL(GenericSetup):
