@@ -981,6 +981,7 @@ def run_server(config):
             'hostname': platform.node(),
             'server_type': platform.platform(),
         }
+        # TODO include config['server_dir_whitelist'] in SSDP response (if server_dir_whitelist_policy is not 'silent')?
         ssdp_server = upnp_ssdp.MySsdpThreadServer()
         ssdp_server._settings = ssdp_settings
         ssdp_server.start()
