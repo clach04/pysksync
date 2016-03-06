@@ -358,7 +358,9 @@ def ssdp_server_processor_sample(sock, client_addr, header_dict, settings):
     respond_to_wildcard = settings.get('respond_to_wildcard', True)
     logger = logging.getLogger("ssdp_server")
     service_name = settings['service_name']
-    st = header_dict['st']
+    st = header_dict.get('st')  # seen an Android device NOT provide ST field
+    if st is None:
+        log.debug('header mising ST field: %r', header_dict)
     service_name_match = False
     if respond_to_wildcard and (st == 'ssdp:all' or st == 'upnp:rootdevice'):
         service_name_match = True
