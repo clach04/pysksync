@@ -461,8 +461,9 @@ def receive_file_content(session_info, reader, full_filename, mtime, file_safety
     logger.debug('filesize: %r', filesize)
     logger.info('processing %r', ((full_filename, filesize, mtime),))  # TODO add option to supress this?
 
-    # Now buffer entire file contents
+    # For now buffer entire file contents -- irrespective of FILE_SAFETY_BACKUP or FILE_SAFETY_RENAME_AFTER_WRITE option
     # if there is a network error existing files are left alone
+    # TODO add file buffer reading for large file support
     filecontents = reader.recv(filesize)
     logger.debug('filecontents: %r', filecontents)
 
@@ -770,7 +771,7 @@ class MyTCPHandler(SocketServer.BaseRequestHandler):
         server_files_set = set(server_files)
         client_files_set = set(client_files)
 
-        # if SKSYNC_PROTOCOL_TYPE_BIDIRECTIONAL_* or SKSYNC_PROTOCOL_TYPE_FROM_SERVER_
+        # TODO add check; if SKSYNC_PROTOCOL_TYPE_BIDIRECTIONAL_* or SKSYNC_PROTOCOL_TYPE_FROM_SERVER_
         # files that are not on client
         missing_from_client = server_files_set.difference(client_files_set)
 
@@ -786,6 +787,7 @@ class MyTCPHandler(SocketServer.BaseRequestHandler):
                 # 'server ahead'
                 missing_from_client.add(filename)
             """
+            TODO without line below will miss files that are changed on client
             elif mtime_diff < -fuzz_factor:
                 print 'client ahead'
             else:
