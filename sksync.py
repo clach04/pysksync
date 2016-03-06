@@ -130,6 +130,16 @@ SKSYNC_PROTOCOL_TYPE_BIDIRECTIONAL_NO_TIME = '3\n'
 SKSYNC_PROTOCOL_TYPE_TO_SERVER_USE_TIME = '1\n'
 SKSYNC_PROTOCOL_TYPE_TO_SERVER_NO_TIME = '4\n'
 
+def protocol_use_time(sksync_protocol_type):
+    """where sksync_protocol_type is one of SKSYNC_PROTOCOL_TYPE_*
+    """
+    return sksync_protocol_type in (SKSYNC_PROTOCOL_TYPE_FROM_SERVER_USE_TIME, SKSYNC_PROTOCOL_TYPE_BIDIRECTIONAL_USE_TIME, SKSYNC_PROTOCOL_TYPE_TO_SERVER_USE_TIME)
+
+def protocol_to_server(sksync_protocol_type):
+    """where sksync_protocol_type is one of SKSYNC_PROTOCOL_TYPE_*
+    """
+    return sksync_protocol_type in (SKSYNC_PROTOCOL_TYPE_BIDIRECTIONAL_USE_TIME, SKSYNC_PROTOCOL_TYPE_BIDIRECTIONAL_NO_TIME, SKSYNC_PROTOCOL_TYPE_TO_SERVER_USE_TIME, SKSYNC_PROTOCOL_TYPE_TO_SERVER_NO_TIME)
+
 SKSYNC_PROTOCOL_RECURSIVE = '0\n'
 SKSYNC_PROTOCOL_NON_RECURSIVE = '1\n'
 
@@ -767,9 +777,13 @@ class MyTCPHandler(SocketServer.BaseRequestHandler):
         # server_path does not exist, SK Sync simply returns 0 files
         server_files = get_file_listings(server_path, recursive=recursive, include_size=True, return_list=False, force_unicode=True)
         logger.info('Number of files on server %r ', (len(server_files),))
-        
+
         server_files_set = set(server_files)
         client_files_set = set(client_files)
+
+        send_file_to_server = protocol_to_server(sync_type)
+        if send_file_to_server:
+            missing_from_server = client_files_set.difference(server_files_set)
 
         # TODO add check; if SKSYNC_PROTOCOL_TYPE_BIDIRECTIONAL_* or SKSYNC_PROTOCOL_TYPE_FROM_SERVER_
         # files that are not on client
@@ -786,6 +800,11 @@ class MyTCPHandler(SocketServer.BaseRequestHandler):
                 # if SKSYNC_PROTOCOL_TYPE_BIDIRECTIONAL_* or SKSYNC_PROTOCOL_TYPE_FROM_SERVER_
                 # 'server ahead'
                 missing_from_client.add(filename)
+
+            if send_file_to_server:
+                if mtime_diff < -fuzz_factor:
+                    # 'client ahead'
+                    missing_from_server.add(filename)
             """
             TODO without line below will miss files that are changed on client
             elif mtime_diff < -fuzz_factor:
@@ -798,7 +817,6 @@ class MyTCPHandler(SocketServer.BaseRequestHandler):
         # if SKSYNC_PROTOCOL_TYPE_BIDIRECTIONAL_* or SKSYNC_PROTOCOL_TYPE_TO_SERVER_*
         if sync_type in (SKSYNC_PROTOCOL_TYPE_TO_SERVER_USE_TIME, SKSYNC_PROTOCOL_TYPE_TO_SERVER_NO_TIME, SKSYNC_PROTOCOL_TYPE_BIDIRECTIONAL_USE_TIME, SKSYNC_PROTOCOL_TYPE_BIDIRECTIONAL_NO_TIME):
             byte_count_recv = received_file_count = 0
-            missing_from_server = client_files_set.difference(server_files_set)
             for filename in missing_from_server:
                 logger.debug('File to get: %r', filename)
                 mtime = client_files[filename]
