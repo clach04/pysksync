@@ -10,7 +10,11 @@ try:
     import ssl
 except ImportError:
     ssl = None
-import SocketServer
+try:
+    import SocketServer  # py2
+except ImportError:
+    import socketserver as SocketServer  # py3 hack
+
 import threading
 import select
 import logging
@@ -85,6 +89,16 @@ except ImportError:
     except ImportError:
         easydialogs = None
 
+try:
+    to_unicode = unicode
+except NameError:
+    # py3
+    unicode = str
+    def to_unicode(x, encoding='us-ascii'):
+        if isinstance(x, bytes):
+            return x.decode(encoding)
+        else:
+            return x
 
 def fake_module(name):
     # Fail with a clear message (possibly at an unexpected time in the future)
@@ -98,7 +112,7 @@ def fake_module(name):
     return MissingModule()
 
 try:
-    import srp  # from https://pypi.python.org/pypi/srp
+    import srp  # from https://pypi.python.org/pypi/srp  (needs six for py3)
 except ImportError:
     srp = fake_module('srp')
 
@@ -119,16 +133,16 @@ SYSTEM_ENCODING = SYSTEM_ENCODING or 'UTF-8'  # TODO could allow config setting 
 SKSYNC_DEFAULT_PORT = 23456
 #SKSYNC_DEFAULT_PORT = 23456 + 1  # FIXME DEBUG not default!!
 #SKSYNC_DEFAULT_PORT = 23456 + 3  # FIXME DEBUG not default!!
-SKSYNC_PROTOCOL_01 = 'sksync 1\n'
-PYSKSYNC_PROTOCOL_01 = 'pysksync 1\n'  # same as SKSYNC_PROTOCOL_01 but using UTF-8 for filenames on wire protocol
-PYSKSYNC_PROTOCOL_02 = 'pysksync 2\n'  # same as PYSKSYNC_PROTOCOL_01 but requires checksum on each file
-SKSYNC_PROTOCOL_ESTABLISHED = 'Protocol Established\n'
-SKSYNC_PROTOCOL_TYPE_FROM_SERVER_USE_TIME = '2\n'
-SKSYNC_PROTOCOL_TYPE_FROM_SERVER_NO_TIME = '5\n'
-SKSYNC_PROTOCOL_TYPE_BIDIRECTIONAL_USE_TIME = '0\n'  # NOTE BIDIRECTIONAL needs checksum support
-SKSYNC_PROTOCOL_TYPE_BIDIRECTIONAL_NO_TIME = '3\n'
-SKSYNC_PROTOCOL_TYPE_TO_SERVER_USE_TIME = '1\n'
-SKSYNC_PROTOCOL_TYPE_TO_SERVER_NO_TIME = '4\n'
+SKSYNC_PROTOCOL_01 = b'sksync 1\n'
+PYSKSYNC_PROTOCOL_01 = b'pysksync 1\n'  # same as SKSYNC_PROTOCOL_01 but using UTF-8 for filenames on wire protocol
+PYSKSYNC_PROTOCOL_02 = b'pysksync 2\n'  # same as PYSKSYNC_PROTOCOL_01 but requires checksum on each file
+SKSYNC_PROTOCOL_ESTABLISHED = b'Protocol Established\n'
+SKSYNC_PROTOCOL_TYPE_FROM_SERVER_USE_TIME = b'2\n'
+SKSYNC_PROTOCOL_TYPE_FROM_SERVER_NO_TIME = b'5\n'
+SKSYNC_PROTOCOL_TYPE_BIDIRECTIONAL_USE_TIME = b'0\n'  # NOTE BIDIRECTIONAL needs checksum support
+SKSYNC_PROTOCOL_TYPE_BIDIRECTIONAL_NO_TIME = b'3\n'
+SKSYNC_PROTOCOL_TYPE_TO_SERVER_USE_TIME = b'1\n'
+SKSYNC_PROTOCOL_TYPE_TO_SERVER_NO_TIME = b'4\n'
 
 def protocol_use_time(sksync_protocol_type):
     """where sksync_protocol_type is one of SKSYNC_PROTOCOL_TYPE_*
@@ -140,15 +154,15 @@ def protocol_to_server(sksync_protocol_type):
     """
     return sksync_protocol_type in (SKSYNC_PROTOCOL_TYPE_BIDIRECTIONAL_USE_TIME, SKSYNC_PROTOCOL_TYPE_BIDIRECTIONAL_NO_TIME, SKSYNC_PROTOCOL_TYPE_TO_SERVER_USE_TIME, SKSYNC_PROTOCOL_TYPE_TO_SERVER_NO_TIME)
 
-SKSYNC_PROTOCOL_RECURSIVE = '0\n'
-SKSYNC_PROTOCOL_NON_RECURSIVE = '1\n'
+SKSYNC_PROTOCOL_RECURSIVE = b'0\n'
+SKSYNC_PROTOCOL_NON_RECURSIVE = b'1\n'
 
 if ssl:
     SSL_VERSION = ssl.PROTOCOL_TLSv1
 
 
 # PYSKSYNC specific constants
-PYSKSYNC_CR_START = 'PYSKSYNC SRP START:'  # Challenge Response start message
+PYSKSYNC_CR_START = b'PYSKSYNC SRP START:'  # Challenge Response start message
 
 
 # File backup constants used by )
@@ -159,7 +173,7 @@ FILE_SAFETY_RENAME_AFTER_WRITE = 2  # Only replace file after success file IO (a
 
 # Checksum lookup, could add alternatives like sha1, sha256, etc.
 checksum_lookup = {
-    'md5': md5,
+    b'md5': md5,
 }
 
 
@@ -191,7 +205,7 @@ IGNORE_SET_TIME_ERRORS = False
 def set_utime(a, b):
     try:
         os.utime(a, b)
-    except OSError, info:
+    except OSError as info:
         if IGNORE_SET_TIME_ERRORS:
             # probably Android https://groups.google.com/forum/#!msg/python-for-android/MlOLiTOeK0o/_5m2jtvXsNIJ
             pass
@@ -202,7 +216,7 @@ def safe_mkdir(newdir):
     result_dir = os.path.abspath(newdir)
     try:
         os.makedirs(result_dir)
-    except OSError, info:
+    except OSError as info:
         if info.errno == errno.EEXIST and os.path.isdir(result_dir):
             pass
         else:
@@ -266,9 +280,9 @@ def unnorm_mtime(m):
 
 
 def parse_file_details(in_str):
-    mtime, filename = in_str.split(' ', 1)
+    mtime, filename = in_str.split(b' ', 1)
     mtime = norm_mtime(mtime)
-    assert filename.endswith('\n')
+    assert filename.endswith(b'\n')
     filename = filename[:-1]
     return (filename, mtime)
 
@@ -283,7 +297,7 @@ class SKBufferedSocket(object):
     """
     def __init__(self, server_sock):
         self.server_sock = server_sock
-        self.data = ''
+        self.data = b''
     
     def __iter__(self):
         return self
@@ -303,12 +317,12 @@ class SKBufferedSocket(object):
     
     def next(self):
         while 1:
-            if not self.data or '\n' not in self.data:
+            if not self.data or b'\n' not in self.data:
                 logger.debug("about to call server_sock.recv")
                 self.data = self.data + self.server_sock.recv(BIGBUF)
                 logger.debug("data from socket = %r", (len(self.data), self.data))
             if self.data:
-                newline_pos = self.data.find('\n')
+                newline_pos = self.data.find(b'\n')
                 #if '\n' in data:
                 if newline_pos >= 0:
                     data = self.data[:newline_pos + 1]
@@ -356,8 +370,8 @@ def get_file_listings(path_of_files, recursive=False, include_size=False, return
     """
     glob_wildcard = '*'
     if force_unicode:
-        path_of_files = unicode(path_of_files)
-        glob_wildcard = unicode(glob_wildcard)
+        path_of_files = to_unicode(path_of_files)
+        glob_wildcard = to_unicode(glob_wildcard)
     if recursive:
         file_list = list(path_walker(path_of_files))
     current_dir = os.getcwd()  # TODO non-ascii; os.getcwdu()
@@ -383,7 +397,7 @@ def get_file_listings(path_of_files, recursive=False, include_size=False, return
                 if isinstance(filename, str):
                     # This is probably Windows
                     # Assume str, in locale encoding
-                    filename = filename.decode(SYSTEM_ENCODING)
+                    filename = to_unicode(filename,SYSTEM_ENCODING)
             if include_size:
                 file_details = (filename, mtime, x.st_size)
             else:
@@ -425,14 +439,15 @@ def send_file_content(session_info, sender, filename, file_meta_data=None):
         checksum_obj = checksum_func()
         checksum_obj.update(filecontents)
         checksum_str = checksum_obj.hexdigest()
+        checksum_str = checksum_str.encode('us-ascii')
 
     if file_meta_data is not None:
         assert data_len == filecontents_len
-        message = '%s\n%d\n' % (send_filename, mtime)
+        message = b'%s\n%d\n' % (send_filename, mtime)
         len_sent = sender.send(message)
         logger.debug('sent: len %d %r', len_sent, message)
 
-    message = '%d\n' % filecontents_len
+    message = b'%d\n' % filecontents_len
     len_sent = sender.send(message)
     logger.debug('sent: len %d %r', len_sent, message)
 
@@ -442,7 +457,7 @@ def send_file_content(session_info, sender, filename, file_meta_data=None):
     logger.debug('sent: len %d', len_sent)
 
     if checksum:
-        message = '%s\n' % checksum_str
+        message = b'%s\n' % checksum_str
         len_sent = sender.send(message)
         logger.debug('sent: len %d %r', len_sent, message)
 
@@ -485,6 +500,7 @@ def receive_file_content(session_info, reader, full_filename, mtime, file_safety
         checksum_obj = checksum_func()
         checksum_obj.update(filecontents)
         checksum_str = checksum_obj.hexdigest()
+        checksum_str = checksum_str.encode('us-ascii')
         logger.debug('checksum_str %r', checksum_str)
         assert checksum_str == remote_checksum_str, (checksum_str, remote_checksum_str, full_filename)  # FIXME add if check and raise network error
 
@@ -525,11 +541,12 @@ def receive_file_content(session_info, reader, full_filename, mtime, file_safety
 
 def receive_files(session_info, reader, save_to_dir, filename_encoding):
     # if get CR end of session, otherwise get files
+    save_to_dir = save_to_dir.decode(PYSKSYNC_FILENAME_ENCODING)
     response = reader.next()
     logger.debug('Received: %r', response)
     received_file_count = 0
     byte_count_recv = 0
-    while response != '\n':
+    while response != b'\n':
         filename = response[:-1]  # loose trailing \n
         logger.debug('filename: %r', filename)
         filename = filename.decode(filename_encoding)
@@ -557,7 +574,7 @@ def filename2wireformat(session_info, filename):
         send_filename = filename
     if isinstance(send_filename, str):
         # Assume str, in locale encoding
-        send_filename = send_filename.decode(SYSTEM_ENCODING)
+        send_filename = to_unicode(send_filename, SYSTEM_ENCODING)
     if isinstance(send_filename, unicode):
         # Need to send binary/byte across wire
         send_filename = send_filename.encode(filename_encoding)
@@ -606,7 +623,7 @@ class MyTCPHandler(SocketServer.BaseRequestHandler):
                                     keyfile=ssl_server_keyfile,
                                     ssl_version=SSL_VERSION)
                 logger.info('SSL connected using %r', self.request.cipher())
-            except ssl.SSLError, info:
+            except ssl.SSLError as info:
                 if raise_errors:
                     raise
                 logger.error('Error starting SSL, check certificate and key are valid. %r', info)
@@ -633,13 +650,14 @@ class MyTCPHandler(SocketServer.BaseRequestHandler):
                     # bad user/verifier
                     raise PAKEFailure()
                 I, A = binascii.unhexlify(I_hex), binascii.unhexlify(A_hex)
+                I = I.decode(PYSKSYNC_FILENAME_ENCODING)
                 logger.info('attempting authentication for user %s' % I)
 
                 #salt, vkey = config['users'][I]['authsrp']
                 authsrp = config['users'].get(I, {}).get('authsrp')
                 if not authsrp:
                     # User does not exist
-                    raise PAKEFailure()
+                    raise PAKEFailure('User %r does not exist' % I)
                 try:
                     salt, vkey = authsrp
                 except ValueError:
@@ -650,7 +668,7 @@ class MyTCPHandler(SocketServer.BaseRequestHandler):
                 s, B = svr.get_challenge()
                 if s is None or B is None:
                     raise PAKEFailure()
-                message = '%s %s\n' % (binascii.hexlify(s), binascii.hexlify(B))
+                message = b'%s %s\n' % (binascii.hexlify(s), binascii.hexlify(B))
                 logger.debug('sending: len %d %r' % (len(message), message, ))
                 len_sent = self.request.send(message)
                 logger.debug('sent: len %d' % (len_sent, ))
@@ -661,7 +679,7 @@ class MyTCPHandler(SocketServer.BaseRequestHandler):
                 HAMK = svr.verify_session(M)
                 if HAMK is None:
                     raise PAKEFailure()
-                message = '%s\n' % (binascii.hexlify(HAMK),)
+                message = b'%s\n' % (binascii.hexlify(HAMK),)
                 logger.debug('sending: len %d %r' % (len(message), message, ))
                 len_sent = self.request.send(message)
                 logger.debug('sent: len %d' % (len_sent, ))
@@ -674,7 +692,7 @@ class MyTCPHandler(SocketServer.BaseRequestHandler):
                 logger.debug('Received: %r' % response)
             except PAKEFailure:
                 logger.error('SRP PAKEFailure server side, missing auth or client auth does not match server.')
-                message = '\n'  # Empty message so that client should also raise a PAKEFailure
+                message = b'\n'  # Empty message so that client should also raise a PAKEFailure
                 logger.debug('sending: len %d %r' % (len(message), message, ))
                 len_sent = self.request.send(message)
                 logger.debug('sent: len %d' % (len_sent, ))
@@ -738,7 +756,7 @@ class MyTCPHandler(SocketServer.BaseRequestHandler):
                 else:
                     logger.error('client requested path %r which is not in "server_dir_whitelist"', server_path)
                     raise NotAllowed('access to path %r' % server_path)
-        server_path = unicode(server_path)  # Ensure server directory is Unicode
+        server_path = to_unicode(server_path)  # Ensure server directory is Unicode
         session_info['server_path'] = server_path
 
         client_path = reader.next()
@@ -746,9 +764,9 @@ class MyTCPHandler(SocketServer.BaseRequestHandler):
         session_info['client_path'] = client_path
 
         if sync_protocol == PYSKSYNC_PROTOCOL_02:
-            checksum = 'md5'  # it is fast
+            checksum = b'md5'  # it is fast
             logger.info('checksum %r', checksum)
-            message = '%s\n' % checksum
+            message = b'%s\n' % checksum
             len_sent = self.request.send(message)
             logger.debug('sent: len %d %r', len_sent, message)
             session_info['checksum'] = checksum
@@ -757,7 +775,7 @@ class MyTCPHandler(SocketServer.BaseRequestHandler):
         response = reader.next()
         logger.debug('Received: %r', response)
         client_files = {}
-        while response != '\n':
+        while response != b'\n':
             # TODO start counting and other stats
             # read all file details
             filename, mtime = parse_file_details(response)
@@ -821,7 +839,7 @@ class MyTCPHandler(SocketServer.BaseRequestHandler):
                 logger.debug('File to get: %r', filename)
                 mtime = client_files[filename]
                 send_filename = filename2wireformat(session_info, filename)
-                file_details = '%s\n' % (send_filename, )
+                file_details = b'%s\n' % (send_filename, )
                 logger.debug('file_details: %r', file_details)
                 self.request.send(file_details)
 
@@ -833,7 +851,7 @@ class MyTCPHandler(SocketServer.BaseRequestHandler):
                 logger.info('%r bytes in %d files sent by client', byte_count_recv, received_file_count)  # FIXME timer?
 
         # we're done receiving data from client now
-        self.request.send('\n')
+        self.request.send(b'\n')
 
         # send new files to the client
         logger.info('Number of files for server to send %r out of %r ', len(missing_from_client), len(server_files))
@@ -860,7 +878,7 @@ class MyTCPHandler(SocketServer.BaseRequestHandler):
                         continue
 
                 # Tell client there are no files to send back
-            self.request.sendall('\n')
+            self.request.sendall(b'\n')
         finally:
             os.chdir(current_dir)
         sync_timer.stop()
@@ -1028,7 +1046,7 @@ def client_start_sync(ip, port, server_path, client_path, sync_type=SKSYNC_PROTO
     real_client_path = os.path.abspath(client_path)
     session_info['server_path'] = server_path
     session_info['client_path'] = real_client_path
-    file_list_str = ''
+    file_list_str = b''
 
     username = username or ''
     password = password or ''
@@ -1054,7 +1072,7 @@ def client_start_sync(ip, port, server_path, client_path, sync_type=SKSYNC_PROTO
     # Make filenames/paths Unicode
     client_path = client_path.encode(SYSTEM_ENCODING)
     real_client_path = os.path.abspath(client_path)
-    file_list_str = ''
+    file_list_str = b''
 
     logger.info('filename_encoding %r', filename_encoding)
     logger.info('determining client files for %r', real_client_path)
@@ -1069,14 +1087,14 @@ def client_start_sync(ip, port, server_path, client_path, sync_type=SKSYNC_PROTO
         try:
             if isinstance(filename, str):
                 # Assume str, in locale encoding
-                filename = filename.decode(SYSTEM_ENCODING)
+                filename = to_unicode(filename, SYSTEM_ENCODING)
             # Check filename allowed in transport encoding, for backwards compat
             # for utf-8 over the wire (i.e. not using Original SK Server/client)
             # this check is not needed
             if isinstance(filename, unicode):
                 # Need to send binary/byte across wire
                 filename = filename.encode(filename_encoding)
-            file_details = '%d %s' % (mtime, filename)
+            file_details = b'%d %s' % (mtime, filename)
             file_list_info.append(file_details)
         except UnicodeEncodeError:
             # Skip this file
@@ -1089,7 +1107,7 @@ def client_start_sync(ip, port, server_path, client_path, sync_type=SKSYNC_PROTO
     delta = len(file_list) - len(file_list_info)
     if delta != 0:
         logger.info('Skiping %d', delta)
-    file_list_str = '\n'.join(file_list_info)  # this is bytes
+    file_list_str = b'\n'.join(file_list_info)  # this is bytes
 
     # Connect to the server
     logger.info('client connecting to server %s:%d', ip, port)
@@ -1120,7 +1138,7 @@ def client_start_sync(ip, port, server_path, client_path, sync_type=SKSYNC_PROTO
                                ssl_version=SSL_VERSION)
             s.connect((ip, port))
             logger.info('SSL connected using %r', s.cipher())
-        except ssl.SSLError, info:
+        except ssl.SSLError as info:
             if raise_errors:
                 raise
             logger.error('Error starting SSL connection, check SSL is enabled on server and certificate and key are valid. %r', info)
@@ -1187,8 +1205,10 @@ def client_start_sync(ip, port, server_path, client_path, sync_type=SKSYNC_PROTO
         logger.info('attempting authentication for user %s' % username)
         usr = srp.User(username, password)
         I, A = usr.start_authentication()
+        I = I.encode(PYSKSYNC_FILENAME_ENCODING)
 
-        message = '%s%s %s\n' % (PYSKSYNC_CR_START, binascii.hexlify(I), binascii.hexlify(A))
+        message = b'%s%s %s\n' % (PYSKSYNC_CR_START, binascii.hexlify(I), binascii.hexlify(A))
+        #message = b'%s%s %s\n' % (PYSKSYNC_CR_START, binascii.hexlify(I).encode('us-ascii'), binascii.hexlify(A).encode('us-ascii'))
         logger.debug('sending: len %d %r' % (len(message), message, ))
         len_sent = s.send(message)
         logger.debug('sent: len %d' % (len_sent, ))
@@ -1209,7 +1229,7 @@ def client_start_sync(ip, port, server_path, client_path, sync_type=SKSYNC_PROTO
         M = usr.process_challenge(_s, B)
         if M is None:
             raise PAKEFailure()
-        message = '%s\n' % (binascii.hexlify(M),)
+        message = b'%s\n' % (binascii.hexlify(M),)
         logger.debug('sending: len %d %r' % (len(message), message, ))
         len_sent = s.send(message)
         logger.debug('sent: len %d' % (len_sent, ))
@@ -1259,11 +1279,11 @@ def client_start_sync(ip, port, server_path, client_path, sync_type=SKSYNC_PROTO
     len_sent = s.send(message)
     logger.debug('sent: len %d %r', len_sent, message)
 
-    message = server_path + '\n'
+    message = server_path + b'\n'
     len_sent = s.send(message)
     logger.debug('sent: len %d %r', len_sent, message)
 
-    message = client_path + '\n'
+    message = client_path + b'\n'
     len_sent = s.send(message)
     logger.debug('sent: len %d %r', len_sent, message)
 
@@ -1280,7 +1300,7 @@ def client_start_sync(ip, port, server_path, client_path, sync_type=SKSYNC_PROTO
         len_sent = s.send(message)
         logger.debug('sent: len %d %r', len_sent, message)
 
-    message = '\n\n'
+    message = b'\n\n'
     len_sent = s.send(message)
     logger.debug('sent: len %d %r', len_sent, message)
 
@@ -1296,12 +1316,12 @@ def client_start_sync(ip, port, server_path, client_path, sync_type=SKSYNC_PROTO
         logger.debug('Received: %r', response)
         sent_file_count = 0
         byte_count_sent = 0
-        while response != '\n':
+        while response != b'\n':
             filename = response[:-1]  # loose trailing \n
             logger.debug('filename: %r', filename)
             filename = filename.decode(filename_encoding)
 
-            full_filename = os.path.join(client_path, filename)
+            full_filename = os.path.join(to_unicode(client_path, filename_encoding) , filename)  # TODO consider caching Unicode form of client_path
             full_filename_dir = os.path.dirname(full_filename)
             # Not all platforms support Unicode file names (e.g. Python android)
             full_filename = full_filename.encode(SYSTEM_ENCODING)
@@ -1316,7 +1336,7 @@ def client_start_sync(ip, port, server_path, client_path, sync_type=SKSYNC_PROTO
         # Receive a response
         response = reader.next()
         logger.debug('Received: %r', response)
-        assert response == '\n'
+        assert response == b'\n'
 
     byte_count_recv, received_file_count = receive_files(session_info, reader, real_client_path, filename_encoding)
 
@@ -1401,12 +1421,12 @@ def easydialogs_gui(config):
     elif result == easydialogs_no:
         # Show Client menu
         client_names = list(config.get('clients', {}).keys())
-        print client_names
+        print(client_names)
         if 'client_1' not in client_names:
             client_names.append('client_1')
         if 'client_2' not in client_names:
             client_names.append('client_2')
-        print client_names
+        print(client_names)
         # just pick first, don't pop()
         client_1 = client_names[0]
         client_2 = client_names[1]
@@ -1479,7 +1499,7 @@ def main(argv=None):
             if host and port:
                 break
 
-        print host, port
+        print(host, port)
     else:
         run_server(config)
     

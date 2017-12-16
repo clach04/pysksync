@@ -145,7 +145,7 @@ TLSv1/SSLv3 and AES256-SHA encryption.
 
 Users, authentication, and passwords
 
-This server supports Secure Remote Password protocol (SRP-6a), user verifier
+This server has optional support for Secure Remote Password protocol (SRP-6a), user verifier
 information is stored in the json file (as hex), sample entry for a user
 "testuser" with a password of "testpassword".
 
@@ -173,3 +173,6 @@ A client can sync with the following config file:
             "client_path": "/tmp/client/path"
         },
     }
+
+SRP support depends on https://github.com/cocagne/pysrp
+(under py3 relies on https://github.com/benjaminp/six).

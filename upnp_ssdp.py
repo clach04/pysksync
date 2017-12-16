@@ -35,11 +35,17 @@ import socket
 import select
 import threading
 import time
-import httplib
+try:
+    from httplib import HTTPResponse
+except ImportError:
+    from http.client import HTTPResponse  # py3
 try:
     import cStringIO as StringIO
 except ImportError:
-    import StringIO
+    try:
+        import StringIO
+    except ImportError:
+        from io import BytesIO as StringIO
 
 
 log = logging.getLogger('upnp_ssdp')
@@ -74,7 +80,7 @@ SSDP_QUERY_STRING = "\r\n".join([
 # TODO useragent should really be included
 
 
-class Response(httplib.HTTPResponse):
+class Response(HTTPResponse):
     """
     NB if this is an response that does not start with 'HTTP/1.1 200 OK', stdlib httplib.HTTPResponse() will fail to find anything.
     """
@@ -178,15 +184,15 @@ def show_devices():
     log.info('Looking for published SSDP services on network')
     services = ssdp_discover()
     for x in services:
-        print '-' * 65
-        print x
-        print services[x]['server']
-        print services[x]
+        print('-' * 65)
+        print(x)
+        print(services[x]['server'])
+        print(services[x])
 
 
 def print_all(*args, **kwargs):
     """simply shows all ssdp discovery requests"""
-    print '\t', args, kwargs
+    print('\t', args, kwargs)
 
 
 def demo_service(service_name, respond_to_wildcard=True, process_func=print_all, host_ip=SSDP_MULTICAST_ADDR, host_port=SSDP_PORT):
@@ -208,17 +214,17 @@ def demo_service(service_name, respond_to_wildcard=True, process_func=print_all,
             raw_bytes, peer_info = data
             if raw_bytes.startswith('NOTIFY * HTTP/1.1\r\n'):
                 # We have an SSDP Advertiser
-                print 'SSDP Advertiser'
+                print('SSDP Advertiser')
                 peer_ip, peer_port = peer_info
-                print '\t', peer_ip, peer_port
-                print '\t', repr(raw_bytes)
+                print('\t', peer_ip, peer_port)
+                print('\t', repr(raw_bytes))
                 header_dict = simple_http_headers_processor(raw_bytes, unique_key=None)
-                print '\t', header_dict
+                print('\t', header_dict)
                 from pprint import pprint
                 pprint(header_dict)
             elif raw_bytes.startswith('M-SEARCH * HTTP/1.1\r\n'):
-                print 'client searching for a service'
-                print '\t', data
+                print('client searching for a service')
+                print('\t', data)
                 # We have a client searching for a service
                 peer_ip, peer_port = peer_info
                 header_dict = simple_http_headers_processor(raw_bytes, unique_key=None)
@@ -226,15 +232,15 @@ def demo_service(service_name, respond_to_wildcard=True, process_func=print_all,
                 service_name_match = False
                 if respond_to_wildcard and (st == 'ssdp:all' or st == 'upnp:rootdevice'):
                     service_name_match = True
-                print '\t', (service_name , st)
+                print('\t', (service_name , st))
                 if service_name == st:
-                    print '\t', 'st'
+                    print('\t', 'st')
                     service_name_match = True
                 if service_name_match:
                     process_func(sock, peer_ip, peer_port, header_dict)
             else:
-                print '????????????'
-                print data
+                print('????????????')
+                print (data)
     finally:
         sock.close()
 

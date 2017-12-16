@@ -22,43 +22,42 @@ SKIP_TIME_TIME_CHECK = False
 # NOTE currently tests are hard coded for 3 files
 # fixtures need to contain 3 until test is more dynamic
 test_fixtures_us_ascii = {
-    'test1.txt': (1345316082.71875, '1'),
-    'test2.txt': (1345316082.71875 - 12, '2'),
-    'test3.txt': (1345316082.71875 - 72, '3'),
+    'test1.txt': (1345316082.71875, b'1'),
+    'test2.txt': (1345316082.71875 - 12, b'2'),
+    'test3.txt': (1345316082.71875 - 72, b'3'),
 }
 
 test_fixtures_us_ascii_unicode_filenames = {
-    u'test1.txt': (1345316082.71875, '1'),
-    u'test2.txt': (1345316082.71875 - 12, '2'),
-    u'test3.txt': (1345316082.71875 - 72, '3'),
+    u'test1.txt': (1345316082.71875, b'1'),
+    u'test2.txt': (1345316082.71875 - 12, b'2'),
+    u'test3.txt': (1345316082.71875 - 72, b'3'),
 }
 
 # latin1 (i.e. Western European (iso-8559-1, iso-8559-15, and cp1252)
 test_fixtures_latin1 = {
-    ##u'test\u00DC.txt': (1345316082.71875, '1'),  # uppercase U-umlaut / U-diaeresis # NOTE case sensitive test
-    u'test\u00FC.txt': (1345316082.71875 - 12, '2'),  # lowercase U-umlaut / U-diaeresis
-    u'testB.txt': (1345316082.71875 - 72, '3'),
-    u'testC.txt': (1345316082.71875 - 72, '4'),
+    ##u'test\u00DC.txt': (1345316082.71875, b'1'),  # uppercase U-umlaut / U-diaeresis # NOTE case sensitive test
+    u'test\u00FC.txt': (1345316082.71875 - 12, b'2'),  # lowercase U-umlaut / U-diaeresis
+    u'testB.txt': (1345316082.71875 - 72, b'3'),
+    u'testC.txt': (1345316082.71875 - 72, b'4'),
 }
 
 # Asia
 test_fixtures_asia = {
-    u'test\u9152.txt': (1345316082.71875 - 12, '2'),  # Unicode Han Character 'wine, spirits, liquor, alcoholic beverage
-    u'testB.txt': (1345316082.71875 - 72, '3'),
-    u'testC.txt': (1345316082.71875 - 72, '4'),
+    u'test\u9152.txt': (1345316082.71875 - 12, b'2'),  # Unicode Han Character 'wine, spirits, liquor, alcoholic beverage
+    u'testB.txt': (1345316082.71875 - 72, b'3'),
+    u'testC.txt': (1345316082.71875 - 72, b'4'),
 }
-
 
 def safe_rmtree(testdir):
     """Windows fails to delete filenames with characters not in locale
     if directory name was not encoded in Unicode to begin with
-    even if directory name s 7 bit clean ASCII!"""
-    testdir = unicode(testdir)
+    even if directory name is 7 bit clean ASCII!"""
+    testdir = sksync.to_unicode(testdir)
     if '*' in testdir:
         raise ValueError('directory name %r appears to contain wildcard' % testdir)
     try:
         shutil.rmtree(testdir)
-    except OSError, info:
+    except OSError as info:
         if info.errno == errno.ENOENT:
             pass
         else:
@@ -80,7 +79,7 @@ def check_file_contents_and_mtime(pathname, filename, test_fixtures, skip_time_t
     canon_mtime, canon_data = test_fixtures[filename]
     filename = os.path.join(pathname, filename)
     x = os.stat(filename)
-    f = open(filename)
+    f = open(filename, 'rb')
     data = f.read()
     f.close()
     assert canon_data == data, 'for %r; canon %r != results %r' % (filename, canon_data, data)
@@ -151,7 +150,7 @@ class TestFileWalk(unittest.TestCase):
     
     def test_non_recursive_dir(self):
         file_list = sksync.get_file_listings(self.test_dir, recursive=False, include_size=True, return_list=True)
-        canon = [('test3.txt', 1345316010000L, 1L), ('test1.txt', 1345316082000L, 1L), ('test2.txt', 1345316070000L, 1L)]
+        canon = [('test3.txt', 1345316010000, 1), ('test1.txt', 1345316082000, 1), ('test2.txt', 1345316070000, 1)]
         canon.sort()
         file_list.sort()
         self.assertEqual(canon, file_list)
@@ -171,12 +170,12 @@ class TestFileWalk(unittest.TestCase):
     
     def test_recursive_dir2(self):
         file_list = sksync.get_file_listings(self.test_dir, recursive=True, include_size=True, return_list=True)
-        canon = [(os.path.join('subdir1', 'test1.txt'), 1345316082000L, 1L),
-                (os.path.join('subdir1', 'test2.txt'), 1345316070000L, 1L),
-                (os.path.join('subdir1', 'test3.txt'), 1345316010000L, 1L),
-                ('test1.txt', 1345316082000L, 1L),
-                ('test2.txt', 1345316070000L, 1L),
-                ('test3.txt', 1345316010000L, 1L),
+        canon = [(os.path.join('subdir1', 'test1.txt'), 1345316082000, 1),
+                (os.path.join('subdir1', 'test2.txt'), 1345316070000, 1),
+                (os.path.join('subdir1', 'test3.txt'), 1345316010000, 1),
+                ('test1.txt', 1345316082000, 1),
+                ('test2.txt', 1345316070000, 1),
+                ('test3.txt', 1345316010000, 1),
                 ]
         canon.sort()
         file_list.sort()
@@ -284,7 +283,7 @@ class TestSKSync(GenericSetup):
         result = os.path.isdir(self.server_dir)
         
         # Ensure server sends no files if the client already has files of same name that are ahead of the server files
-        test_string = 'NEVER_INCLUDE_THIS_STRING_IN_TESTS'
+        test_string = b'NEVER_INCLUDE_THIS_STRING_IN_TESTS'
         for filename in self.test_fixtures:
             self.assertTrue(os.path.isfile(os.path.join(self.server_dir, filename)))
             tmp_client_file = os.path.join(self.client_dir, filename)
@@ -317,7 +316,7 @@ class TestSKSync(GenericSetup):
         #import pdb ; pdb.set_trace()  # DEBUG
 
     def test_sync_from_server_with_times_to_nonempty_client_directory_client_same_timestamps(self):
-        test_string = 'NEVER_INCLUDE_THIS_STRING_IN_TESTS'
+        test_string = b'NEVER_INCLUDE_THIS_STRING_IN_TESTS'
         # Ensure server sends no files if the client already has files of same name that are the same time as the server files
         create_test_files(self.test_fixtures, testdir=self.client_dir, data_override=test_string)
         result = os.path.isdir(self.server_dir)
@@ -371,7 +370,7 @@ class TestSKSync(GenericSetup):
 
         # do sync
         self.perform_sync(self.server_dir, self.client_dir, recursive=True)
-        #x = raw_input('pausned')
+        #x = raw_input('paused')
         
         # check files exist
         self.assertTrue(os.path.isfile(os.path.join(self.client_dir, self.TEST_FILENAME_1)))
@@ -406,7 +405,7 @@ class TestSKSync(GenericSetup):
         #import pdb ; pdb.set_trace()
 
         # update single client file
-        test_string = 'client updated'
+        test_string = b'client updated'
         filename = canon_filenames[0]  # 'test1.txt'
         local_client_test_fixtures[filename] = (local_client_test_fixtures[filename][0], test_string)
         self.assertTrue(os.path.isfile(os.path.join(self.server_dir, filename)))
@@ -418,7 +417,7 @@ class TestSKSync(GenericSetup):
         self.check_file_contents_and_mtime(self.server_dir, filename)
 
         # update single server file
-        test_string = 'server updated'
+        test_string = b'server updated'
         filename = canon_filenames[1]  # 'test2.txt'
         local_server_test_fixtures[filename] = (local_server_test_fixtures[filename][0], test_string)
         local_client_test_fixtures[filename] = local_server_test_fixtures[filename]
@@ -570,7 +569,7 @@ class TestSKSyncBiDirectionalUseTime(TestSKSync):
         #import pdb ; pdb.set_trace()
 
         # update single client file
-        test_string = 'client updated'
+        test_string = b'client updated'
         filename = 'test1.txt'
         local_test_fixtures[filename] = (local_test_fixtures[filename][0], test_string)
         self.assertTrue(os.path.isfile(os.path.join(self.server_dir, filename)))
@@ -582,7 +581,7 @@ class TestSKSyncBiDirectionalUseTime(TestSKSync):
         self.check_file_contents_and_mtime(self.server_dir, filename)
 
         # update single server file
-        test_string = 'server updated'
+        test_string = b'server updated'
         filename = 'test2.txt'
         local_test_fixtures[filename] = (local_test_fixtures[filename][0], test_string)
         self.assertTrue(os.path.isfile(os.path.join(self.client_dir, filename)))
