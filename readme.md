@@ -1,7 +1,7 @@
 pysksync - a Pure Python implementation of the SK Sync protocol
 
 The can be used with the existing Android SK Sync client and
-Java SK Sync server.
+Java SK Sync server. Tested with Python 2.7.13 and 3.6.1.
 
 For more information see the wiki at
 https://bitbucket.org/clach04/pysksync/wiki/Home
