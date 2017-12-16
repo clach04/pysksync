@@ -1441,6 +1441,8 @@ def main(argv=None):
     # TODO proper argument parsing
     logger.setLevel(logging.INFO)
     #logger.setLevel(logging.DEBUG)
+    logger.info('Python %s on %s', sys.version, sys.platform)
+
     try:
         conf_filename = argv[1]
     except IndexError:
