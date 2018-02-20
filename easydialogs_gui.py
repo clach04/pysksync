@@ -33,7 +33,7 @@ def main(argv=None):
         config = sksync.load_json(f.read())
         f.close()
     except IOError:
-        print 'config file not found, defaulting config'
+        print('config file not found, defaulting config')
         config = {}
 
     # defaults
