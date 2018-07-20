@@ -1470,7 +1470,9 @@ def main(argv=None):
     logger.info('attempting to open config: %r', conf_filename)
     try:
         f = open(conf_filename, 'rb')
-        config = load_json(f.read())
+        config_data = f.read()
+        config_data = config_data.decode('utf-8')  # handle older Python 3.x json libraries
+        config = load_json(config_data)
         f.close()
     except IOError:
         config = {}

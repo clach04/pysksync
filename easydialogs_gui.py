@@ -30,7 +30,9 @@ def main(argv=None):
     logger.info('attempting to open config: %r', conf_filename)
     try:
         f = open(conf_filename, 'rb')
-        config = sksync.load_json(f.read())
+        config_data = f.read()
+        config_data = config_data.decode('utf-8')  # handle older Python 3.x json libraries
+        config = sksync.load_json(config_data)
         f.close()
     except IOError:
         print('config file not found, defaulting config')
@@ -38,6 +40,7 @@ def main(argv=None):
 
     # defaults
     config = sksync.set_default_config(config)
+    #print(config)  # debug
 
     sksync.easydialogs_gui(config)
     return 0
