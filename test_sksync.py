@@ -19,6 +19,7 @@ safe_mkdir = sksync.safe_mkdir
 
 TEST_DIR = 'tmp_testsuitedir'
 SERVER_TEST_DIR = os.path.join(TEST_DIR, 'server')
+CLIENT_TEST_DIR = os.path.join(TEST_DIR, 'client')
 
 
 SKIP_TIME_TIME_CHECK = False
@@ -187,7 +188,7 @@ class TestFileWalk(unittest.TestCase):
 
 
 class GenericSetup(unittest.TestCase):
-    def setUp(self, test_fixtures=test_fixtures_us_ascii, server_dir=SERVER_TEST_DIR, client_dir=os.path.join(TEST_DIR, 'client')):
+    def setUp(self, test_fixtures=test_fixtures_us_ascii, server_dir=SERVER_TEST_DIR, client_dir=CLIENT_TEST_DIR):
         # NOTE using Python unittest, setUp() is called before EACH and every
         self.server_dir = server_dir
         self.client_dir = client_dir
@@ -213,7 +214,7 @@ class GenericSetup(unittest.TestCase):
 
 
 class TestSKSync(GenericSetup):
-    def setUp(self, test_fixtures=test_fixtures_us_ascii, server_dir=SERVER_TEST_DIR, client_dir=os.path.join(TEST_DIR, 'client')):
+    def setUp(self, test_fixtures=test_fixtures_us_ascii, server_dir=SERVER_TEST_DIR, client_dir=CLIENT_TEST_DIR):
         GenericSetup.setUp(self, test_fixtures, server_dir=server_dir, client_dir=client_dir)
 
     def test_sync_from_server_with_times_to_empty_client_directory(self):
@@ -475,8 +476,8 @@ class TestSKSyncAsiaFiles(TestSKSync):
 # document client to server (SKSYNC_PROTOCOL_TYPE_TO_SERVER_USE_TIME) - currently this test is the only documentation
 # TODO test bi-directional (SKSYNC_PROTOCOL_TYPE_BIDIRECTIONAL_USE_TIME) sync
 class TestSKSyncClientPush(TestSKSync):
-    #def setUp(self, test_fixtures=test_fixtures_us_ascii, server_dir=SERVER_TEST_DIR, client_dir=os.path.join(TEST_DIR, 'client')):
-    def setUp(self, test_fixtures=test_fixtures_us_ascii, server_dir=os.path.join(TEST_DIR, 'client'), client_dir=SERVER_TEST_DIR):
+    #def setUp(self, test_fixtures=test_fixtures_us_ascii, server_dir=SERVER_TEST_DIR, client_dir=CLIENT_TEST_DIR):
+    def setUp(self, test_fixtures=test_fixtures_us_ascii, server_dir=CLIENT_TEST_DIR, client_dir=SERVER_TEST_DIR):
         # NOTE switch client and server directory
         GenericSetup.setUp(self, test_fixtures, server_dir=server_dir, client_dir=client_dir)
 
@@ -516,8 +517,8 @@ class TestSKSyncClientPush(TestSKSync):
 
 
 class TestSKSyncBiDirectionalUseTime(TestSKSync):
-    def setUp(self, test_fixtures=test_fixtures_us_ascii, server_dir=SERVER_TEST_DIR, client_dir=os.path.join(TEST_DIR, 'client')):
-        #def setUp(self, test_fixtures=test_fixtures_us_ascii, server_dir=os.path.join(TEST_DIR, 'client'), client_dir=SERVER_TEST_DIR):
+    def setUp(self, test_fixtures=test_fixtures_us_ascii, server_dir=SERVER_TEST_DIR, client_dir=CLIENT_TEST_DIR):
+        #def setUp(self, test_fixtures=test_fixtures_us_ascii, server_dir=CLIENT_TEST_DIR, client_dir=SERVER_TEST_DIR):
         # NOTE switch client and server directory
         GenericSetup.setUp(self, test_fixtures, server_dir=server_dir, client_dir=client_dir)
 
