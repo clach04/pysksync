@@ -751,6 +751,8 @@ except AttributeError:
     TestSKSync.assertFalse = TestSKSync.failIf
 
 if __name__ == '__main__':
+    print('Python %s on %s' % (sys.version, sys.platform))
+    #log.debug('Python %s on %s', sys.version, sys.platform)  # TODO make this info?  in main lib?
     #sksync.logger.setLevel(sksync.logging.INFO)  # Debug
     #sksync.logger.setLevel(sksync.logging.DEBUG)  # Debug
     sksync.logging.disable(sksync.logging.ERROR)  # ugh!
