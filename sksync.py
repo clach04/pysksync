@@ -1399,6 +1399,7 @@ def set_default_config(config):
     config['users'] = config.get('users', {})
     config['raise_errors'] = config.get('raise_errors', True)
     config['ssdp_advertise'] = config.get('ssdp_advertise', True)
+    config['gtk_easydialogs'] = config.get('gtk_easydialogs', False)
     return config
 
 
@@ -1430,9 +1431,10 @@ def easydialogs_gui(config):
         # just pick first, don't pop()
         client_1 = client_names[0]
         client_2 = client_names[1]
-        # Hack for gtk easydialogs, which does NOT accept Unicode type strings but does accept utf-8 Unicode encoding byte strings
-        client_1 = client_1.encode('utf-8')
-        client_2 = client_2.encode('utf-8')
+        if config['gtk_easydialogs']:
+            # Hack for gtk easydialogs, which does NOT accept Unicode type strings but does accept utf-8 Unicode encoding byte strings
+            client_1 = client_1.encode('utf-8')
+            client_2 = client_2.encode('utf-8')
 
         client_result = easydialogs_yes
         while client_result != easydialogs_cancel:
