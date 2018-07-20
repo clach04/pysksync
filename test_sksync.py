@@ -17,6 +17,9 @@ import sksync
 safe_mkdir = sksync.safe_mkdir
 
 
+TEST_DIR = 'tmp_testsuitedir'
+
+
 SKIP_TIME_TIME_CHECK = False
 
 # NOTE currently tests are hard coded for 3 files
@@ -87,7 +90,7 @@ def check_file_contents_and_mtime(pathname, filename, test_fixtures, skip_time_t
         assert abs(canon_mtime - x.st_mtime) <= 1, 'canon_mtime mismatch x.st_mtime: %r' % ((canon_mtime, x.st_mtime),)  # with in 1 second
 
 
-def create_test_files(test_fixtures, testdir='tmp_testsuitedir', data_override=None):
+def create_test_files(test_fixtures, testdir=TEST_DIR, data_override=None):
 
     safe_rmtree(testdir)
     safe_mkdir(testdir)
@@ -142,7 +145,7 @@ def perform_sync(server_dir, client_dir, HOST='127.0.0.1', PORT=get_random_port(
 class TestFileWalk(unittest.TestCase):
     def setUp(self, test_fixtures=test_fixtures_us_ascii):
         # NOTE using Python unittest, setUp() is called before EACH and every
-        self.test_dir = os.path.join('tmp_testsuitedir', 'walk')
+        self.test_dir = os.path.join(TEST_DIR, 'walk')
         self.test_fixtures = test_fixtures
         create_test_files(self.test_fixtures, testdir=self.test_dir)
         sub_test_dir = os.path.join(self.test_dir, 'subdir1')
@@ -183,7 +186,7 @@ class TestFileWalk(unittest.TestCase):
 
 
 class GenericSetup(unittest.TestCase):
-    def setUp(self, test_fixtures=test_fixtures_us_ascii, server_dir=os.path.join('tmp_testsuitedir', 'server'), client_dir=os.path.join('tmp_testsuitedir', 'client')):
+    def setUp(self, test_fixtures=test_fixtures_us_ascii, server_dir=os.path.join(TEST_DIR, 'server'), client_dir=os.path.join(TEST_DIR, 'client')):
         # NOTE using Python unittest, setUp() is called before EACH and every
         self.server_dir = server_dir
         self.client_dir = client_dir
@@ -209,7 +212,7 @@ class GenericSetup(unittest.TestCase):
 
 
 class TestSKSync(GenericSetup):
-    def setUp(self, test_fixtures=test_fixtures_us_ascii, server_dir=os.path.join('tmp_testsuitedir', 'server'), client_dir=os.path.join('tmp_testsuitedir', 'client')):
+    def setUp(self, test_fixtures=test_fixtures_us_ascii, server_dir=os.path.join(TEST_DIR, 'server'), client_dir=os.path.join(TEST_DIR, 'client')):
         GenericSetup.setUp(self, test_fixtures, server_dir=server_dir, client_dir=client_dir)
 
     def test_sync_from_server_with_times_to_empty_client_directory(self):
@@ -471,8 +474,8 @@ class TestSKSyncAsiaFiles(TestSKSync):
 # document client to server (SKSYNC_PROTOCOL_TYPE_TO_SERVER_USE_TIME) - currently this test is the only documentation
 # TODO test bi-directional (SKSYNC_PROTOCOL_TYPE_BIDIRECTIONAL_USE_TIME) sync
 class TestSKSyncClientPush(TestSKSync):
-    #def setUp(self, test_fixtures=test_fixtures_us_ascii, server_dir=os.path.join('tmp_testsuitedir', 'server'), client_dir=os.path.join('tmp_testsuitedir', 'client')):
-    def setUp(self, test_fixtures=test_fixtures_us_ascii, server_dir=os.path.join('tmp_testsuitedir', 'client'), client_dir=os.path.join('tmp_testsuitedir', 'server')):
+    #def setUp(self, test_fixtures=test_fixtures_us_ascii, server_dir=os.path.join(TEST_DIR, 'server'), client_dir=os.path.join(TEST_DIR, 'client')):
+    def setUp(self, test_fixtures=test_fixtures_us_ascii, server_dir=os.path.join(TEST_DIR, 'client'), client_dir=os.path.join(TEST_DIR, 'server')):
         # NOTE switch client and server directory
         GenericSetup.setUp(self, test_fixtures, server_dir=server_dir, client_dir=client_dir)
 
@@ -512,8 +515,8 @@ class TestSKSyncClientPush(TestSKSync):
 
 
 class TestSKSyncBiDirectionalUseTime(TestSKSync):
-    def setUp(self, test_fixtures=test_fixtures_us_ascii, server_dir=os.path.join('tmp_testsuitedir', 'server'), client_dir=os.path.join('tmp_testsuitedir', 'client')):
-        #def setUp(self, test_fixtures=test_fixtures_us_ascii, server_dir=os.path.join('tmp_testsuitedir', 'client'), client_dir=os.path.join('tmp_testsuitedir', 'server')):
+    def setUp(self, test_fixtures=test_fixtures_us_ascii, server_dir=os.path.join(TEST_DIR, 'server'), client_dir=os.path.join(TEST_DIR, 'client')):
+        #def setUp(self, test_fixtures=test_fixtures_us_ascii, server_dir=os.path.join(TEST_DIR, 'client'), client_dir=os.path.join(TEST_DIR, 'server')):
         # NOTE switch client and server directory
         GenericSetup.setUp(self, test_fixtures, server_dir=server_dir, client_dir=client_dir)
 
