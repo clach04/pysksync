@@ -118,6 +118,8 @@ except ImportError:
 
 import upnp_ssdp
 
+is_android = 'ANDROID_ARGUMENT' in os.environ
+
 PYSKSYNC_FILENAME_ENCODING = 'UTF-8'
 FILENAME_ENCODING = 'cp1252'  # latin1 encoding used by sksync 1
 language_name, SYSTEM_ENCODING = locale.getdefaultlocale()
@@ -1469,6 +1471,8 @@ def main(argv=None):
         conf_filename = argv[1]
     except IndexError:
         conf_filename = 'sksync.json'
+        if is_android:
+            conf_filename = os.path.join(os.path.dirname(__file__), conf_filename)  # assume config file in same directory as code
     logger.info('attempting to open config: %r', conf_filename)
     try:
         f = open(conf_filename, 'rb')
