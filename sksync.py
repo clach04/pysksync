@@ -743,6 +743,7 @@ class MyTCPHandler(SocketServer.BaseRequestHandler):
         server_path = reader.next()
         logger.debug('server_path: %r', server_path)
         server_path = server_path[:-1]  # loose trailing \n
+        server_path = to_unicode(server_path)  # Ensure server directory is Unicode
         server_path = os.path.abspath(server_path)
         logger.debug('server_path abs: %r', server_path)
         server_dir_whitelist = []
@@ -760,7 +761,6 @@ class MyTCPHandler(SocketServer.BaseRequestHandler):
                 else:
                     logger.error('client requested path %r which is not in "server_dir_whitelist"', server_path)
                     raise NotAllowed('access to path %r' % server_path)
-        server_path = to_unicode(server_path)  # Ensure server directory is Unicode
         session_info['server_path'] = server_path
 
         client_path = reader.next()
