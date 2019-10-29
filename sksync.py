@@ -1493,6 +1493,8 @@ def main(argv=None):
     if config.get('debug'):
         logger.setLevel(logging.DEBUG)
 
+    logger.debug("config %r", config)
+
     if 'gui' in argv:
         easydialogs_gui(config)
     elif 'client' in argv:
