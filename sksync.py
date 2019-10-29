@@ -1490,6 +1490,8 @@ def main(argv=None):
     # defaults
     config = set_default_config(config)
     #print dump_json(config, indent=4)
+    if config.get('debug'):
+        logger.setLevel(logging.DEBUG)
 
     if 'gui' in argv:
         easydialogs_gui(config)
