@@ -1476,7 +1476,9 @@ def main(argv=None):
         config_data = config_data.decode('utf-8')  # handle older Python 3.x json libraries
         config = load_json(config_data)
         f.close()
+        logger.info('config loaded')
     except IOError:
+        logger.info('defaulting empty config')
         config = {}
 
     # defaults
