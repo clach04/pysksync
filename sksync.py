@@ -203,6 +203,8 @@ logger.addHandler(ch)
 #logger.setLevel(logging.DEBUG)
 
 IGNORE_SET_TIME_ERRORS = False
+if is_android:
+    IGNORE_SET_TIME_ERRORS = True
 
 def set_utime(a, b):
     try:
@@ -1388,8 +1390,8 @@ def set_default_config(config):
     config['host'] = config.get('host', '0.0.0.0')
     config['port'] = config.get('port', SKSYNC_DEFAULT_PORT)
     config['sksync1_compat'] = config.get('sksync1_compat', False)
-    config['ignore_time_errors'] = config.get('ignore_time_errors', False)
     global IGNORE_SET_TIME_ERRORS
+    config['ignore_time_errors'] = config.get('ignore_time_errors', IGNORE_SET_TIME_ERRORS)
     IGNORE_SET_TIME_ERRORS = config['ignore_time_errors']
     config['use_ssl'] = config.get('use_ssl', False)
     if config['sksync1_compat']:
