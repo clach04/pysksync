@@ -1447,7 +1447,6 @@ def set_default_config(config):
     config['users'] = config.get('users', {})
     config['raise_errors'] = config.get('raise_errors', True)
     config['ssdp_advertise'] = config.get('ssdp_advertise', upnp_ssdp is True)
-    print('debg %r', config['ssdp_advertise'])
     config['gtk_easydialogs'] = config.get('gtk_easydialogs', False)
     config['filter_fnmatch_exclude'] = config.get('filter_fnmatch_exclude', [])  # list of glob patterns https://docs.python.org/3/library/fnmatch.html TODO include
     return config
