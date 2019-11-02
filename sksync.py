@@ -21,6 +21,7 @@ import logging
 import platform
 import glob
 import errno
+import fnmatch
 import binascii
 import locale
 
@@ -346,6 +347,27 @@ class SKBufferedSocket(object):
 
 ###############################################################
 
+# from https://codereview.stackexchange.com/questions/74713/filtering-with-multiple-inclusion-and-exclusion-patterns
+def super_filter(names, inclusion_patterns=None, exclusion_patterns=None):
+    """
+    Enhanced version of fnmatch.filter() that accepts multiple inclusion and exclusion patterns.
+
+    If only inclusion_patterns is specified, only the names which match one or more patterns are returned.
+    If only exclusion_patterns is specified, only the names which do not match any pattern are returned.
+    If both are specified, the exclusion patterns take precedence.
+    If neither is specified, the input is returned as-is.
+    """
+    included = multi_filter(names, inclusion_patterns) if inclusion_patterns else names
+    excluded = multi_filter(names, exclusion_patterns) if exclusion_patterns else []
+    return set(included) - set(excluded)
+
+def multi_filter(names, patterns):
+    """Generator function which yields the names that match one or more of the patterns."""
+    for name in names:
+        if any(fnmatch.fnmatch(name, pattern) for pattern in patterns):
+            yield name
+
+
 def path_walker(path_to_search, filename_filter=None, abspath=False):
     """Walk directory of files, directory depth first, returns generator
     """
@@ -367,6 +389,7 @@ def path_walker(path_to_search, filename_filter=None, abspath=False):
     ## but lacks "topdown" support, walk class later
     for dirpath, dirnames, filenames in os.walk(path_to_search, topdown=False):
         filenames.sort()
+        # TODO refactor filtering of names code - filter function only sees filename (not path)
         for temp_filename in filenames:
             if filename_filter(temp_filename):
                 temp_filename = os.path.join(dirpath, temp_filename)
@@ -376,7 +399,7 @@ def path_walker(path_to_search, filename_filter=None, abspath=False):
 
 ###############################################################
 
-def get_file_listings(path_of_files, recursive=False, include_size=False, return_list=True, force_unicode=False, return_unicode=True):  # TODO filter function
+def get_file_listings(path_of_files, recursive=False, include_size=False, return_list=True, force_unicode=False, return_unicode=True, filename_filter=None):
     """return_list=True, if False returns dict
     """
     glob_wildcard = '*'
@@ -384,7 +407,7 @@ def get_file_listings(path_of_files, recursive=False, include_size=False, return
         path_of_files = to_unicode(path_of_files)
         glob_wildcard = to_unicode(glob_wildcard)
     if recursive:
-        file_list = list(path_walker(path_of_files))  # TODO filter function
+        file_list = list(path_walker(path_of_files, filename_filter=filename_filter))
     current_dir = os.getcwd()  # TODO non-ascii; os.getcwdu()
     os.chdir(path_of_files)  # TODO non-ascii path names
 
@@ -799,12 +822,19 @@ class MyTCPHandler(SocketServer.BaseRequestHandler):
             response = reader.next()
             logger.debug('Received: %r', response)
 
+        if config['filter_fnmatch_exclude']:
+            def filename_filter_func(filename):
+                # NOTE filename passed in, not full pathname
+                return super_filter([filename], exclusion_patterns=config['filter_fnmatch_exclude'])
+        else:
+            filename_filter_func = None
+
         # TODO start counting and other stats
         # TODO output count and other stats
         logger.info('Number of files on client %r ', (len(client_files),))
         # NOTE if sync type is SKSYNC_PROTOCOL_TYPE_FROM_SERVER_* and
         # server_path does not exist, SK Sync simply returns 0 files
-        server_files = get_file_listings(server_path, recursive=recursive, include_size=True, return_list=False, force_unicode=True)
+        server_files = get_file_listings(server_path, recursive=recursive, include_size=True, return_list=False, force_unicode=True, filename_filter=filename_filter_func)
         logger.info('Number of files on server %r ', (len(server_files),))
 
         server_files_set = set(server_files)
@@ -1044,7 +1074,7 @@ def run_server(config):
             ssdp_server.join()  # wait for it to stop
 
 
-def client_start_sync(ip, port, server_path, client_path, sync_type=SKSYNC_PROTOCOL_TYPE_FROM_SERVER_USE_TIME, recursive=False, use_ssl=None, ssl_server_certfile=None, ssl_client_certfile=None, ssl_client_keyfile=None, sksync1_compat=False, raise_errors=True, username=None, password=None):
+def client_start_sync(ip, port, server_path, client_path, sync_type=SKSYNC_PROTOCOL_TYPE_FROM_SERVER_USE_TIME, recursive=False, use_ssl=None, ssl_server_certfile=None, ssl_client_certfile=None, ssl_client_keyfile=None, sksync1_compat=False, raise_errors=True, username=None, password=None, config=None):
     """Implements SK Client, currently only supports:
        * direction =  "from server (use time)" ONLY
     """
@@ -1088,7 +1118,17 @@ def client_start_sync(ip, port, server_path, client_path, sync_type=SKSYNC_PROTO
         force_unicode = True
     else:
         force_unicode = False
-    file_list = get_file_listings(real_client_path, recursive=recursive, force_unicode=force_unicode)
+    filename_filter_func = None  # TODO make this a function if filters defined config['filter_fnmatch_exclude']
+
+    if config['filter_fnmatch_exclude']:
+        def filename_filter_func(filename):
+            # NOTE filename passed in, not full pathname
+            return super_filter([filename], exclusion_patterns=config['filter_fnmatch_exclude'])
+    else:
+        filename_filter_func = None
+
+
+    file_list = get_file_listings(real_client_path, recursive=recursive, force_unicode=force_unicode, filename_filter=filename_filter_func)
     file_list_info = []
     skip_count = 0
     for filename, mtime in file_list:
@@ -1386,7 +1426,7 @@ def run_client(config, config_name='client'):
     ssl_client_keyfile = config.get('ssl_client_keyfile')
     ssl_client_keyfile = client_config.get('ssl_client_keyfile', ssl_client_keyfile)
     ssl_client_certfile = client_config.get('ssl_client_certfile', ssl_client_keyfile)
-    client_start_sync(host, port, server_path, client_path, sync_type=sync_type, recursive=recursive, use_ssl=use_ssl, ssl_server_certfile=ssl_server_certfile, ssl_client_certfile=ssl_client_certfile, ssl_client_keyfile=ssl_client_keyfile, sksync1_compat=sksync1_compat, username=username, password=password)
+    client_start_sync(host, port, server_path, client_path, sync_type=sync_type, recursive=recursive, use_ssl=use_ssl, ssl_server_certfile=ssl_server_certfile, ssl_client_certfile=ssl_client_certfile, ssl_client_keyfile=ssl_client_keyfile, sksync1_compat=sksync1_compat, username=username, password=password, config=config)
 
 
 def set_default_config(config):
@@ -1409,6 +1449,7 @@ def set_default_config(config):
     config['ssdp_advertise'] = config.get('ssdp_advertise', upnp_ssdp is True)
     print('debg %r', config['ssdp_advertise'])
     config['gtk_easydialogs'] = config.get('gtk_easydialogs', False)
+    config['filter_fnmatch_exclude'] = config.get('filter_fnmatch_exclude', [])  # list of glob patterns https://docs.python.org/3/library/fnmatch.html TODO include
     return config
 
 
