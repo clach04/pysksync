@@ -81,6 +81,9 @@ else:
     dump_json = json.dumps
     load_json = json.loads
 
+is_android = 'ANDROID_ARGUMENT' in os.environ
+is_py3 = sys.version_info >= (3,)
+
 try:
     import easydialogs
 except ImportError:
@@ -116,9 +119,13 @@ try:
 except ImportError:
     srp = fake_module('srp')
 
-import upnp_ssdp  # TODO optional this fake_module
+try:
+    if is_py3:
+        raise ImportError()
+    import upnp_ssdp
+except ImportError:
+    upnp_ssdp = fake_module('upnp_ssdp')
 
-is_android = 'ANDROID_ARGUMENT' in os.environ
 
 PYSKSYNC_FILENAME_ENCODING = 'UTF-8'
 FILENAME_ENCODING = 'cp1252'  # latin1 encoding used by sksync 1
@@ -1399,7 +1406,8 @@ def set_default_config(config):
     config['server_dir_whitelist_policy'] = config.get('server_dir_whitelist_policy', 'deny')
     config['users'] = config.get('users', {})
     config['raise_errors'] = config.get('raise_errors', True)
-    config['ssdp_advertise'] = config.get('ssdp_advertise', True)
+    config['ssdp_advertise'] = config.get('ssdp_advertise', upnp_ssdp is True)
+    print('debg %r', config['ssdp_advertise'])
     config['gtk_easydialogs'] = config.get('gtk_easydialogs', False)
     return config
 
