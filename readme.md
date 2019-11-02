@@ -176,3 +176,11 @@ A client can sync with the following config file:
 
 SRP support depends on https://github.com/cocagne/pysrp
 (under py3 relies on https://github.com/benjaminp/six).
+
+-
+
+TODO
+
+  * config direction easier
+  * ssdp discovery not py3 ready
+  * bidrectional

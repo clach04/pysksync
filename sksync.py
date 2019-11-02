@@ -116,7 +116,7 @@ try:
 except ImportError:
     srp = fake_module('srp')
 
-import upnp_ssdp
+import upnp_ssdp  # TODO optional this fake_module
 
 is_android = 'ANDROID_ARGUMENT' in os.environ
 
@@ -369,7 +369,7 @@ def path_walker(path_to_search, filename_filter=None, abspath=False):
 
 ###############################################################
 
-def get_file_listings(path_of_files, recursive=False, include_size=False, return_list=True, force_unicode=False, return_unicode=True):
+def get_file_listings(path_of_files, recursive=False, include_size=False, return_list=True, force_unicode=False, return_unicode=True):  # TODO filter function
     """return_list=True, if False returns dict
     """
     glob_wildcard = '*'
@@ -377,7 +377,7 @@ def get_file_listings(path_of_files, recursive=False, include_size=False, return
         path_of_files = to_unicode(path_of_files)
         glob_wildcard = to_unicode(glob_wildcard)
     if recursive:
-        file_list = list(path_walker(path_of_files))
+        file_list = list(path_walker(path_of_files))  # TODO filter function
     current_dir = os.getcwd()  # TODO non-ascii; os.getcwdu()
     os.chdir(path_of_files)  # TODO non-ascii path names
 
@@ -385,7 +385,7 @@ def get_file_listings(path_of_files, recursive=False, include_size=False, return
         # TODO include file size param
         # Get non-recursive list of files in real_client_path
         # FIXME TODO nasty hack using glob (i.e. not robust)
-        file_list = glob.glob(glob_wildcard)
+        file_list = glob.glob(glob_wildcard)  # NOTE filter function not applied, could be applied in for loop below
     
     if return_list:
         listings_result = []
@@ -869,7 +869,7 @@ class MyTCPHandler(SocketServer.BaseRequestHandler):
             if sync_type in (SKSYNC_PROTOCOL_TYPE_FROM_SERVER_USE_TIME, SKSYNC_PROTOCOL_TYPE_FROM_SERVER_NO_TIME, SKSYNC_PROTOCOL_TYPE_BIDIRECTIONAL_USE_TIME, SKSYNC_PROTOCOL_TYPE_BIDIRECTIONAL_NO_TIME):
                 for filename in missing_from_client:
                     try:
-                        logger.debug('File to send: %r', filename)
+                        logger.debug('File to send: %r', filename)  # TODO use a logging library with scope in case of errors, and use filename for scope
                         mtime, data_len = server_files[filename]
                         send_filename = filename2wireformat(session_info, filename)
                         file_len = send_file_content(session_info, self.request, filename, file_meta_data=(send_filename, mtime, data_len))
@@ -972,9 +972,6 @@ SKSYNC_SSDP_SERVICE_NAME = 'urn:schemas-upnp-org:service:sksync:1'
 
 def run_server(config):
     """Implements SK Server, currently only supports:
-       * direction =  "from server (use time)" ONLY
-       * TODO add option for server to filter/restrict server path
-         (this is not a normal SK Sync option)
     """
 
     config = set_default_config(config)
