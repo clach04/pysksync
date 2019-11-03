@@ -842,12 +842,16 @@ class MyTCPHandler(SocketServer.BaseRequestHandler):
 
         send_file_to_server = is_protocol_to_server(sync_type)
         if send_file_to_server:
+            # determine file(name)s that are not present on server
             missing_from_server = client_files_set.difference(server_files_set)
 
         # TODO add check; if SKSYNC_PROTOCOL_TYPE_BIDIRECTIONAL_* or SKSYNC_PROTOCOL_TYPE_FROM_SERVER_
         # files that are not on client
+        # determine file(name)s that are not present on client
         missing_from_client = server_files_set.difference(client_files_set)
 
+        # now determine file(name)s that exist on both and then determine which need to be sent
+        # traditional sync best practice is normally done with filesize and/or timestamp
         common = server_files_set.intersection(client_files_set)
         # Now find out if any common files are newer
         fuzz_factor = 1  # one second
