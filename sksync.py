@@ -159,7 +159,7 @@ def protocol_use_time(sksync_protocol_type):
     """
     return sksync_protocol_type in (SKSYNC_PROTOCOL_TYPE_FROM_SERVER_USE_TIME, SKSYNC_PROTOCOL_TYPE_BIDIRECTIONAL_USE_TIME, SKSYNC_PROTOCOL_TYPE_TO_SERVER_USE_TIME)
 
-def protocol_to_server(sksync_protocol_type):
+def is_protocol_to_server(sksync_protocol_type):
     """where sksync_protocol_type is one of SKSYNC_PROTOCOL_TYPE_*
     """
     return sksync_protocol_type in (SKSYNC_PROTOCOL_TYPE_BIDIRECTIONAL_USE_TIME, SKSYNC_PROTOCOL_TYPE_BIDIRECTIONAL_NO_TIME, SKSYNC_PROTOCOL_TYPE_TO_SERVER_USE_TIME, SKSYNC_PROTOCOL_TYPE_TO_SERVER_NO_TIME)
@@ -840,7 +840,7 @@ class MyTCPHandler(SocketServer.BaseRequestHandler):
         server_files_set = set(server_files)
         client_files_set = set(client_files)
 
-        send_file_to_server = protocol_to_server(sync_type)
+        send_file_to_server = is_protocol_to_server(sync_type)
         if send_file_to_server:
             missing_from_server = client_files_set.difference(server_files_set)
 
