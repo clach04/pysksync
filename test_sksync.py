@@ -493,7 +493,8 @@ class TestSKSyncClientPush(TestSKSync):
         config['clients']['testing']['server_path'] = client_dir  # NOTE switch client/server directory
         config['clients']['testing']['client_path'] = server_dir  # NOTE switch client/server directory
         config['clients']['testing']['recursive'] = recursive
-        config['clients']['testing']['sync_type'] = sksync.SKSYNC_PROTOCOL_TYPE_TO_SERVER_USE_TIME
+        #config['clients']['testing']['sync_type'] = sksync.SYNC_TYPE_MAPPING['to_server_use_time']
+        config['clients']['testing']['sync_type'] = 'to_server_use_time'
         config = sksync.set_default_config(config)
 
         # Start sync server in thread
@@ -538,7 +539,8 @@ class TestSKSyncBiDirectionalUseTime(TestSKSync):
         config['clients']['testing']['client_path'] = client_dir
 
         config['clients']['testing']['recursive'] = recursive
-        config['clients']['testing']['sync_type'] = sksync.SKSYNC_PROTOCOL_TYPE_BIDIRECTIONAL_USE_TIME
+        #config['clients']['testing']['sync_type'] = sksync.SYNC_TYPE_MAPPING['bidirectional_use_time']
+        config['clients']['testing']['sync_type'] = 'bidirectional_use_time'
         config = sksync.set_default_config(config)
 
         # Start sync server in thread

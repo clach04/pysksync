@@ -154,6 +154,25 @@ SKSYNC_PROTOCOL_TYPE_BIDIRECTIONAL_NO_TIME = b'3\n'
 SKSYNC_PROTOCOL_TYPE_TO_SERVER_USE_TIME = b'1\n'
 SKSYNC_PROTOCOL_TYPE_TO_SERVER_NO_TIME = b'4\n'
 
+"""
+SYNC_TYPE_MAPPING = {
+    'SYNC_FROM_SERVER_USE_TIME': SKSYNC_PROTOCOL_TYPE_FROM_SERVER_USE_TIME,
+    'SYNC_FROM_SERVER_NO_TIME': SKSYNC_PROTOCOL_TYPE_FROM_SERVER_NO_TIME,
+    'SYNC_BIDIRECTIONAL_USE_TIME': SKSYNC_PROTOCOL_TYPE_BIDIRECTIONAL_USE_TIME,
+    'SYNC_BIDIRECTIONAL_NO_TIME': SKSYNC_PROTOCOL_TYPE_BIDIRECTIONAL_NO_TIME,
+    'SYNC_TO_SERVER_USE_TIME': SKSYNC_PROTOCOL_TYPE_TO_SERVER_USE_TIME,
+    'SYNC_TO_SERVER_NO_TIME': SKSYNC_PROTOCOL_TYPE_TO_SERVER_NO_TIME
+}
+"""
+SYNC_TYPE_MAPPING = {
+    'from_server_use_time': SKSYNC_PROTOCOL_TYPE_FROM_SERVER_USE_TIME,
+    'from_server_no_time': SKSYNC_PROTOCOL_TYPE_FROM_SERVER_NO_TIME,
+    'bidirectional_use_time': SKSYNC_PROTOCOL_TYPE_BIDIRECTIONAL_USE_TIME,
+    'bidirectional_no_time': SKSYNC_PROTOCOL_TYPE_BIDIRECTIONAL_NO_TIME,
+    'to_server_use_time': SKSYNC_PROTOCOL_TYPE_TO_SERVER_USE_TIME,
+    'to_server_no_time': SKSYNC_PROTOCOL_TYPE_TO_SERVER_NO_TIME
+}
+
 def protocol_use_time(sksync_protocol_type):
     """where sksync_protocol_type is one of SKSYNC_PROTOCOL_TYPE_*
     """
@@ -1421,7 +1440,11 @@ def run_client(config, config_name='client'):
     if client_sksync1_compat is not None:
         sksync1_compat = client_sksync1_compat
     recursive = client_config.get('recursive')
-    sync_type = client_config.get('sync_type', SKSYNC_PROTOCOL_TYPE_FROM_SERVER_USE_TIME)  # TODO not user friendly...
+    # FIXME / TODO config file should ONLY use name,
+    # internally fine to use codes (as engine needs that)
+    # rename internal engine variable/config usage to be code
+    sync_type = client_config.get('sync_type', 'from_server_use_time')  # TODO not user friendly...
+    sync_type = SYNC_TYPE_MAPPING[sync_type]
 
     username, password = config.get('username'), config.get('password')
 
