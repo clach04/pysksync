@@ -628,6 +628,7 @@ def receive_files(session_info, reader, save_to_dir, filename_encoding):
 
 def filename2wireformat(session_info, filename):
     filename_encoding = session_info['filename_encoding']
+    # FIXME consider removing check and always doing replacement
     if os.path.sep == '\\':
         # Windows path conversion to Unix/protocol
         send_filename = filename.replace('\\', '/')
@@ -905,6 +906,7 @@ class MyTCPHandler(SocketServer.BaseRequestHandler):
             """
 
         # if SKSYNC_PROTOCOL_TYPE_BIDIRECTIONAL_* or SKSYNC_PROTOCOL_TYPE_TO_SERVER_*
+        # About to recieve files from client
         if sync_type in (SKSYNC_PROTOCOL_TYPE_TO_SERVER_USE_TIME, SKSYNC_PROTOCOL_TYPE_TO_SERVER_NO_TIME, SKSYNC_PROTOCOL_TYPE_BIDIRECTIONAL_USE_TIME, SKSYNC_PROTOCOL_TYPE_BIDIRECTIONAL_NO_TIME):
             byte_count_recv = received_file_count = 0
             for filename in missing_from_server:
@@ -1143,6 +1145,7 @@ def client_start_sync(ip, port, server_path, client_path, sync_type=SKSYNC_PROTO
     file_list_str = b''
 
     logger.info('filename_encoding %r', filename_encoding)
+    session_info['filename_encoding'] = filename_encoding
     logger.info('determining client files for %r', real_client_path)
     if SUPPORT_UNICODE_TYPE_FILENAME:
         force_unicode = True
@@ -1163,18 +1166,13 @@ def client_start_sync(ip, port, server_path, client_path, sync_type=SKSYNC_PROTO
     skip_count = 0
     for filename, mtime in file_list:
         try:
-            if isinstance(filename, str):
-                # Assume str, in locale encoding
-                filename = to_unicode(filename, SYSTEM_ENCODING)
-            # Check filename allowed in transport encoding, for backwards compat
-            # for utf-8 over the wire (i.e. not using Original SK Server/client)
-            # this check is not needed
-            if isinstance(filename, unicode):
-                # Need to send binary/byte across wire
-                filename = filename.encode(filename_encoding)
+            ## convert to wire format - at this time I do not know if this is compatible with original sksync.
+            # but if not done and windows client is sending stuff to android/linux server end up with `\` in filenames on server
+            filename = filename2wireformat(session_info, filename)
             file_details = b'%d %s' % (mtime, filename)
             file_list_info.append(file_details)
         except UnicodeEncodeError:
+            # fixme leaky abstraction in filename2wireformat()
             # Skip this file
             logger.error('Encoding error - unable to access and process %r, ignoring', filename)
             skip_count += 1
