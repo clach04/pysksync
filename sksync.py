@@ -1194,202 +1194,205 @@ def client_start_sync(ip, port, server_path, client_path, sync_type=SKSYNC_PROTO
     else:
         s.connect((ip, port))
     logger.info('connected')
-    reader = SKBufferedSocket(s)
+    try:
+        reader = SKBufferedSocket(s)
 
-    if username or password:
-        # SRP-6a - Secure Remote Password protocol
-        """http://srp.stanford.edu/design.html
+        if username or password:
+            # SRP-6a - Secure Remote Password protocol
+            """http://srp.stanford.edu/design.html
 
-          N    A large safe prime (N = 2q+1, where q is prime)
-               All arithmetic is done modulo N.
-          g    A generator modulo N
-          k    Multiplier parameter (k = H(N, g) in SRP-6a, k = 3 for legacy SRP-6)
-          s    User's salt
-          I    Username
-          p    Cleartext Password
-          H()  One-way hash function
-          ^    (Modular) Exponentiation
-          u    Random scrambling parameter
-          a,b  Secret ephemeral values
-          A,B  Public ephemeral values
-          x    Private key (derived from p and s)
-          v    Password verifier
+              N    A large safe prime (N = 2q+1, where q is prime)
+                   All arithmetic is done modulo N.
+              g    A generator modulo N
+              k    Multiplier parameter (k = H(N, g) in SRP-6a, k = 3 for legacy SRP-6)
+              s    User's salt
+              I    Username
+              p    Cleartext Password
+              H()  One-way hash function
+              ^    (Modular) Exponentiation
+              u    Random scrambling parameter
+              a,b  Secret ephemeral values
+              A,B  Public ephemeral values
+              x    Private key (derived from p and s)
+              v    Password verifier
 
-        The host stores passwords using the following formula:
+            The host stores passwords using the following formula:
 
-          x = H(s, p)               (s is chosen randomly)
-          v = g^x                   (computes password verifier)
+              x = H(s, p)               (s is chosen randomly)
+              v = g^x                   (computes password verifier)
 
-        The host then keeps {I, s, v} in its password database.
-        The authentication protocol itself goes as follows:
+            The host then keeps {I, s, v} in its password database.
+            The authentication protocol itself goes as follows:
 
-        User -> Host:  I, A = g^a                  (identifies self, a = random number)
-        Host -> User:  s, B = kv + g^b             (sends salt, b = random number)
+            User -> Host:  I, A = g^a                  (identifies self, a = random number)
+            Host -> User:  s, B = kv + g^b             (sends salt, b = random number)
 
-                Both:  u = H(A, B)
+                    Both:  u = H(A, B)
 
-                User:  x = H(s, p)                 (user enters password)
-                User:  S = (B - kg^x) ^ (a + ux)   (computes session key)
-                User:  K = H(S)
+                    User:  x = H(s, p)                 (user enters password)
+                    User:  S = (B - kg^x) ^ (a + ux)   (computes session key)
+                    User:  K = H(S)
 
-                Host:  S = (Av^u) ^ b              (computes session key)
-                Host:  K = H(S)
+                    Host:  S = (Av^u) ^ b              (computes session key)
+                    Host:  K = H(S)
 
-        Now the two parties have a shared, strong session key K. To complete
-        authentication, they need to prove to each other that their keys
-        match. One possible way:
+            Now the two parties have a shared, strong session key K. To complete
+            authentication, they need to prove to each other that their keys
+            match. One possible way:
 
-        User -> Host:  M = H(H(N) xor H(g), H(I), s, A, B, K)
-        Host -> User:  H(A, M, K)
+            User -> Host:  M = H(H(N) xor H(g), H(I), s, A, B, K)
+            Host -> User:  H(A, M, K)
 
-        The two parties also employ the following safeguards:
+            The two parties also employ the following safeguards:
 
-            The user will abort if he receives B == 0 (mod N) or u == 0.
-            The host will abort if it detects that A == 0 (mod N).
-            The user must show his proof of K first. If the server detects that
-                the user's proof is incorrect, it must abort without showing its
-                own proof of K. 
-        """
-        logger.info('attempting authentication for user %s' % username)
-        usr = srp.User(username, password)
-        I, A = usr.start_authentication()
-        I = I.encode(PYSKSYNC_FILENAME_ENCODING)
+                The user will abort if he receives B == 0 (mod N) or u == 0.
+                The host will abort if it detects that A == 0 (mod N).
+                The user must show his proof of K first. If the server detects that
+                    the user's proof is incorrect, it must abort without showing its
+                    own proof of K. 
+            """
+            logger.info('attempting authentication for user %s' % username)
+            usr = srp.User(username, password)
+            I, A = usr.start_authentication()
+            I = I.encode(PYSKSYNC_FILENAME_ENCODING)
 
-        message = b'%s%s %s\n' % (PYSKSYNC_CR_START, binascii.hexlify(I), binascii.hexlify(A))
-        #message = b'%s%s %s\n' % (PYSKSYNC_CR_START, binascii.hexlify(I).encode('us-ascii'), binascii.hexlify(A).encode('us-ascii'))
-        logger.debug('sending: len %d %r' % (len(message), message, ))
-        len_sent = s.send(message)
-        logger.debug('sent: len %d' % (len_sent, ))
+            message = b'%s%s %s\n' % (PYSKSYNC_CR_START, binascii.hexlify(I), binascii.hexlify(A))
+            #message = b'%s%s %s\n' % (PYSKSYNC_CR_START, binascii.hexlify(I).encode('us-ascii'), binascii.hexlify(A).encode('us-ascii'))
+            logger.debug('sending: len %d %r' % (len(message), message, ))
+            len_sent = s.send(message)
+            logger.debug('sent: len %d' % (len_sent, ))
 
-        response = reader.next()
-        logger.debug('Received: %r' % response)
-        try:
-            s_hex, B_hex = response.split()
-        except ValueError:
-            # split failed, probably got sent back an empty string which is
-            # what the server does when it hits a PAKEFailure
-            raise PAKEFailure()
-        _s, B = binascii.unhexlify(s_hex), binascii.unhexlify(B_hex)
+            response = reader.next()
+            logger.debug('Received: %r' % response)
+            try:
+                s_hex, B_hex = response.split()
+            except ValueError:
+                # split failed, probably got sent back an empty string which is
+                # what the server does when it hits a PAKEFailure
+                raise PAKEFailure()
+            _s, B = binascii.unhexlify(s_hex), binascii.unhexlify(B_hex)
 
-        if s is None or B is None:
-            raise PAKEFailure()
+            if s is None or B is None:
+                raise PAKEFailure()
 
-        M = usr.process_challenge(_s, B)
-        if M is None:
-            raise PAKEFailure()
-        message = b'%s\n' % (binascii.hexlify(M),)
-        logger.debug('sending: len %d %r' % (len(message), message, ))
-        len_sent = s.send(message)
-        logger.debug('sent: len %d' % (len_sent, ))
+            M = usr.process_challenge(_s, B)
+            if M is None:
+                raise PAKEFailure()
+            message = b'%s\n' % (binascii.hexlify(M),)
+            logger.debug('sending: len %d %r' % (len(message), message, ))
+            len_sent = s.send(message)
+            logger.debug('sent: len %d' % (len_sent, ))
 
-        response = reader.next()
-        logger.debug('Received: %r' % response)
-        HAMK = binascii.unhexlify(response.strip())
-        # if HAMK == '', we have a failure, this will be detected in verify_session()
+            response = reader.next()
+            logger.debug('Received: %r' % response)
+            HAMK = binascii.unhexlify(response.strip())
+            # if HAMK == '', we have a failure, this will be detected in verify_session()
 
-        usr.verify_session(HAMK)
-        if not usr.authenticated():
-            raise PAKEFailure()
-        # usr.K is now a shared key available to use
+            usr.verify_session(HAMK)
+            if not usr.authenticated():
+                raise PAKEFailure()
+            # usr.K is now a shared key available to use
 
-    logger.info('sync_protocol %r', sync_protocol)
-    message = sync_protocol
-    len_sent = s.send(message)
-    logger.debug('sent: len %d %r', len_sent, message)
-    
-    # Receive a response
-    response = reader.next()
-    logger.debug('Received: %r', response)
-    assert response == SKSYNC_PROTOCOL_ESTABLISHED
-
-    # type of sync
-    message = sync_type
-    len_sent = s.send(message)
-    logger.debug('sent: len %d %r', len_sent, message)
-    
-    recursive_type = SKSYNC_PROTOCOL_NON_RECURSIVE
-    if recursive:
-        recursive_type = SKSYNC_PROTOCOL_RECURSIVE
-    session_info['recursive'] = recursive
-    
-    # type of sync? and folders to sync (server path, client path)
-    # example: '0\n/tmp/skmemos\n/sdcard/skmemos\n\n'
-    if isinstance(server_path, unicode):
-        # Need to send binary/byte across wire
-        server_path = server_path.encode(filename_encoding)
-    if isinstance(client_path, unicode):
-        # Need to send binary/byte across wire
-        client_path = client_path.encode(filename_encoding)
-
-    # following could be sent in one network IO
-    # for ease of code/protocol reading done seperately
-    message = recursive_type
-    len_sent = s.send(message)
-    logger.debug('sent: len %d %r', len_sent, message)
-
-    message = server_path + b'\n'
-    len_sent = s.send(message)
-    logger.debug('sent: len %d %r', len_sent, message)
-
-    message = client_path + b'\n'
-    len_sent = s.send(message)
-    logger.debug('sent: len %d %r', len_sent, message)
-
-    if sync_protocol == PYSKSYNC_PROTOCOL_02:
-        checksum = reader.next()
-        logger.debug('checksum: %r', checksum)
-        checksum = checksum.strip()
-        logger.info('checksum: %r', checksum)
-        session_info['checksum'] = checksum
-    
-
-    if file_list_str:
-        message = file_list_str
+        logger.info('sync_protocol %r', sync_protocol)
+        message = sync_protocol
         len_sent = s.send(message)
         logger.debug('sent: len %d %r', len_sent, message)
-
-    message = b'\n\n'
-    len_sent = s.send(message)
-    logger.debug('sent: len %d %r', len_sent, message)
-
-    byte_count_recv = received_file_count = 0
-    byte_count_sent = sent_file_count = 0
-
-    #import pdb ; pdb.set_trace()
-    if sync_type in (SKSYNC_PROTOCOL_TYPE_TO_SERVER_USE_TIME, SKSYNC_PROTOCOL_TYPE_TO_SERVER_NO_TIME, SKSYNC_PROTOCOL_TYPE_BIDIRECTIONAL_USE_TIME, SKSYNC_PROTOCOL_TYPE_BIDIRECTIONAL_NO_TIME):
-        # read filename
-        # then send length, then data filename
-        # in a loop
-        response = reader.next()
-        logger.debug('Received: %r', response)
-        sent_file_count = 0
-        byte_count_sent = 0
-        while response != b'\n':
-            filename = response[:-1]  # loose trailing \n
-            logger.debug('filename: %r', filename)
-            filename = filename.decode(filename_encoding)
-
-            full_filename = os.path.join(to_unicode(client_path, filename_encoding) , filename)  # TODO consider caching Unicode form of client_path
-            full_filename_dir = os.path.dirname(full_filename)
-            # Not all platforms support Unicode file names (e.g. Python android)
-            full_filename = full_filename.encode(SYSTEM_ENCODING)
-            full_filename_dir = full_filename_dir.encode(SYSTEM_ENCODING)
-
-            byte_count_sent = send_file_content(session_info, s, full_filename)
-            sent_file_count += 1
-            response = reader.next()
-            logger.debug('Received: %r', response)
-    else:
-        # from server
+        
         # Receive a response
         response = reader.next()
         logger.debug('Received: %r', response)
-        assert response == b'\n'
+        assert response == SKSYNC_PROTOCOL_ESTABLISHED
 
-    byte_count_recv, received_file_count = receive_files(session_info, reader, real_client_path, filename_encoding)
+        # type of sync
+        message = sync_type
+        len_sent = s.send(message)
+        logger.debug('sent: len %d %r', len_sent, message)
+        
+        recursive_type = SKSYNC_PROTOCOL_NON_RECURSIVE
+        if recursive:
+            recursive_type = SKSYNC_PROTOCOL_RECURSIVE
+        session_info['recursive'] = recursive
+        
+        # type of sync? and folders to sync (server path, client path)
+        # example: '0\n/tmp/skmemos\n/sdcard/skmemos\n\n'
+        if isinstance(server_path, unicode):
+            # Need to send binary/byte across wire
+            server_path = server_path.encode(filename_encoding)
+        if isinstance(client_path, unicode):
+            # Need to send binary/byte across wire
+            client_path = client_path.encode(filename_encoding)
 
-    # Clean up
-    s.close()
+        # following could be sent in one network IO
+        # for ease of code/protocol reading done seperately
+        message = recursive_type
+        len_sent = s.send(message)
+        logger.debug('sent: len %d %r', len_sent, message)
+
+        message = server_path + b'\n'
+        len_sent = s.send(message)
+        logger.debug('sent: len %d %r', len_sent, message)
+
+        message = client_path + b'\n'
+        len_sent = s.send(message)
+        logger.debug('sent: len %d %r', len_sent, message)
+
+        if sync_protocol == PYSKSYNC_PROTOCOL_02:
+            checksum = reader.next()
+            logger.debug('checksum: %r', checksum)
+            checksum = checksum.strip()
+            logger.info('checksum: %r', checksum)
+            session_info['checksum'] = checksum
+        
+
+        if file_list_str:
+            message = file_list_str
+            len_sent = s.send(message)
+            logger.debug('sent: len %d %r', len_sent, message)
+
+        message = b'\n\n'
+        len_sent = s.send(message)
+        logger.debug('sent: len %d %r', len_sent, message)
+
+        byte_count_recv = received_file_count = 0
+        byte_count_sent = sent_file_count = 0
+
+        #import pdb ; pdb.set_trace()
+        if sync_type in (SKSYNC_PROTOCOL_TYPE_TO_SERVER_USE_TIME, SKSYNC_PROTOCOL_TYPE_TO_SERVER_NO_TIME, SKSYNC_PROTOCOL_TYPE_BIDIRECTIONAL_USE_TIME, SKSYNC_PROTOCOL_TYPE_BIDIRECTIONAL_NO_TIME):
+            # read filename
+            # then send length, then data filename
+            # in a loop
+            response = reader.next()
+            logger.debug('Received: %r', response)
+            sent_file_count = 0
+            byte_count_sent = 0
+            while response != b'\n':
+                filename = response[:-1]  # loose trailing \n
+                logger.debug('filename: %r', filename)
+                filename = filename.decode(filename_encoding)
+
+                full_filename = os.path.join(to_unicode(client_path, filename_encoding) , filename)  # TODO consider caching Unicode form of client_path
+                full_filename_dir = os.path.dirname(full_filename)
+                # Not all platforms support Unicode file names (e.g. Python android)
+                full_filename = full_filename.encode(SYSTEM_ENCODING)
+                full_filename_dir = full_filename_dir.encode(SYSTEM_ENCODING)
+
+                byte_count_sent = send_file_content(session_info, s, full_filename)
+                sent_file_count += 1
+                response = reader.next()
+                logger.debug('Received: %r', response)
+        else:
+            # from server
+            # Receive a response
+            response = reader.next()
+            logger.debug('Received: %r', response)
+            assert response == b'\n'
+
+        byte_count_recv, received_file_count = receive_files(session_info, reader, real_client_path, filename_encoding)
+
+    finally:
+        # Clean up
+        s.close()
+
     sync_timer.stop()
     logger.info('%r bytes in %d files sent by server in %s', byte_count_recv, received_file_count, sync_timer)
     if skip_count or delta:
