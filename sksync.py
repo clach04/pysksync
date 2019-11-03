@@ -293,7 +293,15 @@ class SimpleTimer(object):
     
     def __str__(self):
         #return stringify(self.num_secs)
-        return '%d secs' % self.num_secs
+        if self.num_secs is None:
+            timediff = gettime() - self._start
+            num_secs = timediff
+            if datetime:
+                if isinstance(timediff, timedelta):
+                    num_secs = timediff.days * 3600 * 24 + timediff.seconds + (timediff.microseconds / 1000000.0)
+            return '%d secs (timer still running)' % num_secs
+        else:
+            return '%d secs' % self.num_secs
 
 # norm/unnorm have not been tested....
 def norm_mtime(m):
@@ -911,8 +919,7 @@ class MyTCPHandler(SocketServer.BaseRequestHandler):
 
                 byte_count_recv += receive_file_content(session_info, reader, full_filename, mtime)
                 received_file_count += 1
-                #logger.info('%r bytes in %d files sent by client in %s', byte_count_recv, received_file_count, timer_details)  # FIXME timer?
-                logger.info('%r bytes in %d files sent by client', byte_count_recv, received_file_count)  # FIXME timer?
+                logger.info('%r bytes in %d files sent by client in %s', byte_count_recv, received_file_count, sync_timer)
 
         # we're done receiving data from client now
         self.request.send(b'\n')
@@ -1380,6 +1387,7 @@ def client_start_sync(ip, port, server_path, client_path, sync_type=SKSYNC_PROTO
         byte_count_sent = sent_file_count = 0
 
         #import pdb ; pdb.set_trace()
+        # Check if client is going to send files to server
         if sync_type in (SKSYNC_PROTOCOL_TYPE_TO_SERVER_USE_TIME, SKSYNC_PROTOCOL_TYPE_TO_SERVER_NO_TIME, SKSYNC_PROTOCOL_TYPE_BIDIRECTIONAL_USE_TIME, SKSYNC_PROTOCOL_TYPE_BIDIRECTIONAL_NO_TIME):
             # read filename
             # then send length, then data filename
@@ -1403,6 +1411,7 @@ def client_start_sync(ip, port, server_path, client_path, sync_type=SKSYNC_PROTO
                 sent_file_count += 1
                 response = reader.next()
                 logger.debug('Received: %r', response)
+            logger.info('%r bytes in %d files sent by client in %s', byte_count_sent, sent_file_count, sync_timer)
         else:
             # from server
             # Receive a response
